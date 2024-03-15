@@ -1,0 +1,16 @@
+<package format="2">
+    <name>point_lio</name>
+    <version>0.1.0</version>
+    <description>A LIDAR and IMU Fusion Framework</description>
+    <maintainer email="tpool@andrew.cmu.edu">Taylor Pool</maintainer>
+    <license>TBD</license>
+    <buildtool_depend>catkin</buildtool_depend>
+    <depend>roscpp</depend>
+    <depend>sensor_msgs</depend>
+    <depend>nav_msgs</depend>
+    <depend>geometry_msgs</depend>
+    <depend>tf2</depend>
+    <depend>tf2_ros</depend>
+    <depend>velodyne_msgs</depend>
+    <depend>pcl_types</depend>
+</package>
