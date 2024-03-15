@@ -1,4 +1,4 @@
-{ lib, stdenv, rosPackages, eigen, cmake, ninja }:
+{ lib, stdenv, rosPackages, eigen, gtsam, cmake, ninja }:
 stdenv.mkDerivation {
 	pname = "point_lio";
 	version = "0.1.0";
@@ -19,5 +19,6 @@ stdenv.mkDerivation {
 		rosPackages.noetic.tf2
 		rosPackages.noetic.tf2-ros
 		eigen
+		gtsam
 	];
 }

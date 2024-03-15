@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Eigen3 3.4 REQUIRED)
+find_package(GTSAM 4.2 REQUIRED)
 
 find_package(catkin REQUIRED
     COMPONENTS
@@ -107,6 +108,8 @@ target_link_libraries(vlp32c_node
 )
 
 add_executable(main
+    src/incremental_kd_tree.cpp
+    src/ekf.cpp
     src/main.cpp
 )
 target_include_directories(main
@@ -115,6 +118,8 @@ target_include_directories(main
     ${catkin_INCLUDE_DIRS}
 )
 target_link_libraries(main
+    gtsam
+    gtsam_unstable
     PCLTypesROS1
     ${catkin_LIBRARIES}
 )
