@@ -8,6 +8,8 @@
 
 int main(int argc, char *argv[]) {
 
+  std::cout << "hello from main\n";
+
   ros::init(argc, argv, "point_lio");
   ros::NodeHandle publicNode;
   ros::NodeHandle privateNode;

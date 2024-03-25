@@ -6,7 +6,11 @@ with import ( builtins.fetchTarball "https://github.com/NixOS/nixpkgs/archive/re
 			rev = "de1ea0a747635d6c0b33b7cfd99b75db6031d05d";
 		} ) + "/overlay.nix" ) )
 		( self: super: {
-			gtsam = super.callPackage ./gtsam.nix {};
+		  gtsam = super.callPackage ./gtsam.nix {};
+      rosPackages.noetic = super.rosPackages.noetic.overrideScope ( rosSelf: rosSuper: {
+        rosgraph = rosSuper.rosgraph.overrideAttrs ( { patches ? [ ], ... }: {
+        patches = patches ++ [./rosgraph.patch];                                                                                                                                                                           
+      } ); } );
 		} )
 	];
 };
