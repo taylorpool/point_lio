@@ -22,6 +22,7 @@ find_package(catkin REQUIRED
         geometry_msgs
         tf2
         tf2_ros
+        rosbag
 )
 
 catkin_package(
@@ -40,6 +41,7 @@ catkin_package(
         geometry_msgs
         tf2
         tf2_ros
+        rosbag
 )
 
 add_library(PCLTypes
@@ -100,6 +102,13 @@ target_link_libraries(vlp16_node
     VelodyneDecoderROS1
 )
 
+add_executable(vlp16_bag_converter
+    src/vlp16_bag_converter.cpp
+)
+target_link_libraries(vlp16_bag_converter
+    VelodyneDecoderROS1
+)
+
 add_executable(vlp32c_node
     src/vlp32c_node.cpp
 )
@@ -107,19 +116,44 @@ target_link_libraries(vlp32c_node
     VelodyneDecoderROS1
 )
 
-add_executable(main
+add_library(PointLIO
     src/incremental_kd_tree.cpp
     src/ekf.cpp
-    src/main.cpp
 )
-target_include_directories(main
+target_include_directories(PointLIO
     PUBLIC
-    include
-    ${catkin_INCLUDE_DIRS}
+        include
 )
-target_link_libraries(main
+target_link_libraries(PointLIO
     gtsam
     gtsam_unstable
-    PCLTypesROS1
+    PCLTypes
+)
+
+add_library(PointLIOROS1
+    src/point_lio_ros1.cpp
+)
+target_include_directories(PointLIOROS1
+    PUBLIC
+        include
+        ${catkin_INCLUDE_DIRS}
+)
+target_link_libraries(PointLIOROS1
     ${catkin_LIBRARIES}
+    PCLTypesROS1
+    PointLIO
+)
+
+add_executable(main
+    src/main.cpp
+)
+target_link_libraries(main
+    PointLIOROS1
+)
+
+add_executable(run_bag
+    src/run_bag.cpp
+)
+target_link_libraries(run_bag
+    PointLIOROS1
 )

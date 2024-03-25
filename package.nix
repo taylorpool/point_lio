@@ -18,6 +18,7 @@ stdenv.mkDerivation {
 		rosPackages.noetic.roscpp
 		rosPackages.noetic.tf2
 		rosPackages.noetic.tf2-ros
+		rosPackages.noetic.rosbag
 		eigen
 		gtsam
 	];
