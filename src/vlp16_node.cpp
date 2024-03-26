@@ -36,9 +36,10 @@ int main(int argc, char *argv[]) {
         const auto scan = decoder.decode(msg);
 
         sensor_msgs::PointCloud2 cloud;
-        pcl_types::ros1::toMsg(scan, cloud);
-        cloud.header = msg->header;
-        cloudPublisher.publish(cloud);
+        if (pcl_types::ros1::toMsg(scan, cloud)) {
+          cloud.header = msg->header;
+          cloudPublisher.publish(cloud);
+        }
       });
 
   ros::spin();

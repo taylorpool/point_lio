@@ -119,6 +119,7 @@ target_link_libraries(vlp32c_node
 add_library(PointLIO
     src/incremental_kd_tree.cpp
     src/ekf.cpp
+    src/point_lio.cpp
 )
 target_include_directories(PointLIO
     PUBLIC

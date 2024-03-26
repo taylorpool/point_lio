@@ -4,8 +4,8 @@
 
 namespace pcl_types::ros1 {
 
-void fromMsg(const sensor_msgs::PointCloud2 &msg,
-             pcl_types::LidarScanStamped &scan) noexcept {
+[[nodiscard]] bool fromMsg(const sensor_msgs::PointCloud2 &msg,
+                           pcl_types::LidarScanStamped &scan) noexcept {
   scan.stamp = msg.header.stamp.toSec();
   scan.cloud.clear();
   scan.cloud.reserve(msg.width);
@@ -35,10 +35,11 @@ void fromMsg(const sensor_msgs::PointCloud2 &msg,
       scan.cloud.push_back(point);
     }
   }
+  return true;
 }
 
-void toMsg(const std::vector<pcl_types::PointXYZICT> &cloud,
-           sensor_msgs::PointCloud2 &msg) noexcept {
+[[nodiscard]] bool toMsg(const std::vector<pcl_types::PointXYZICT> &cloud,
+                         sensor_msgs::PointCloud2 &msg) noexcept {
   msg.height = 1;
 
   msg.width = cloud.size();
@@ -89,12 +90,13 @@ void toMsg(const std::vector<pcl_types::PointXYZICT> &cloud,
     serialize(msg.data, point);
   }
   msg.is_dense = false;
+  return true;
 }
 
-void toMsg(const pcl_types::LidarScanStamped &scan,
-           sensor_msgs::PointCloud2 &msg) noexcept {
+[[nodiscard]] bool toMsg(const pcl_types::LidarScanStamped &scan,
+                         sensor_msgs::PointCloud2 &msg) noexcept {
   msg.header.stamp.fromSec(scan.stamp);
-  toMsg(scan.cloud, msg);
+  return toMsg(scan.cloud, msg);
 }
 
 } // namespace pcl_types::ros1

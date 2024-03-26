@@ -1,3 +1,4 @@
+#include "pcl_types/pcl_types_ros1.hpp"
 #include "point_lio_ros1/point_lio_ros1.hpp"
 
 #include <nav_msgs/Odometry.h>
@@ -7,8 +8,6 @@
 #include <ros/ros.h>
 
 int main(int argc, char *argv[]) {
-
-  std::cout << "hello from main\n";
 
   ros::init(argc, argv, "point_lio");
   ros::NodeHandle publicNode;
@@ -21,13 +20,19 @@ int main(int argc, char *argv[]) {
 
   auto imuSubscriber = publicNode.subscribe<sensor_msgs::Imu>(
       "/cmu_rc2/imu/data", 10, [&](const sensor_msgs::Imu::ConstPtr &imuMsg) {
-
+        point_lio::Imu imu;
+        if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
+          const auto odometry = pointLIO.registerImu(imu);
+        }
       });
 
   auto scanSubscriber = publicNode.subscribe<sensor_msgs::PointCloud2>(
       "/cmu_rc2/velodyne_packets/point_cloud", 10,
       [&](const sensor_msgs::PointCloud2::ConstPtr &scanMsg) {
-
+        pcl_types::LidarScanStamped scan;
+        if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
+          const auto map = pointLIO.registerScan(scan);
+        }
       });
 
   ros::spin();

@@ -57,14 +57,14 @@ template <typename T>
   return sensor_msgs::PointField::INT32;
 }
 
-void fromMsg(const sensor_msgs::PointCloud2 &msg,
-             pcl_types::LidarScanStamped &scan) noexcept;
+[[nodiscard]] bool fromMsg(const sensor_msgs::PointCloud2 &msg,
+                           pcl_types::LidarScanStamped &scan) noexcept;
 
-void toMsg(const std::vector<pcl_types::PointXYZICT> &points,
-           sensor_msgs::PointCloud2 &msg) noexcept;
+[[nodiscard]] bool toMsg(const std::vector<pcl_types::PointXYZICT> &points,
+                         sensor_msgs::PointCloud2 &msg) noexcept;
 
-void toMsg(const pcl_types::LidarScanStamped &scan,
-           sensor_msgs::PointCloud2 &msg) noexcept;
+[[nodiscard]] bool toMsg(const pcl_types::LidarScanStamped &scan,
+                         sensor_msgs::PointCloud2 &msg) noexcept;
 
 } // namespace pcl_types::ros1
 

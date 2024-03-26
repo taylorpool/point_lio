@@ -1,11 +1,19 @@
+#include "pcl_types/pcl_types_ros1.hpp"
 #include "point_lio_ros1/point_lio_ros1.hpp"
 
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 
-#include <sensor_msgs/PointCloud2.h>
+#include <span>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) noexcept {
+  const std::span args(argv, argc);
+
+  if (args.size() < 2) {
+    std::cout << "./run_bag <bag-name>\n";
+    return 1;
+  }
+
   rosbag::Bag bag(argv[1], rosbag::bagmode::Read);
 
   std::vector<std::string> topics{"/cmu_rc2/imu/data",
@@ -14,12 +22,20 @@ int main(int argc, char *argv[]) {
   point_lio::PointLIO pointLIO;
 
   for (const auto &msg : rosbag::View(bag)) {
-    const auto imu = msg.instantiate<sensor_msgs::Imu>();
-    if (imu != nullptr) {
+    const auto imuMsg = msg.instantiate<sensor_msgs::Imu>();
+    if (imuMsg != nullptr) {
+      point_lio::Imu imu;
+      if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
+        const auto odometry = pointLIO.registerImu(imu);
+      }
     }
 
-    const auto scan = msg.instantiate<sensor_msgs::PointCloud2>();
-    if (scan != nullptr) {
+    const auto scanMsg = msg.instantiate<sensor_msgs::PointCloud2>();
+    if (scanMsg != nullptr) {
+      pcl_types::LidarScanStamped scan;
+      if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
+        const auto map = pointLIO.registerScan(scan);
+      }
     }
   }
 
