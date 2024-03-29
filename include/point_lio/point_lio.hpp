@@ -7,10 +7,13 @@
 #include "pcl_types/pcl_types.hpp"
 
 #include <gtsam/navigation/NavState.h>
+#include <gtsam/navigation/CombinedImuFactor.h>
+#include <gtsam/navigation/ImuBias.h>
 
 #include <Eigen/Dense>
 
 #include <chrono>
+#include <optional>
 
 namespace point_lio {
 
@@ -26,6 +29,15 @@ struct Imu {
 
 class PointLIO {
 public:
+  size_t m_imuInitializationQuota;
+  boost::shared_ptr<gtsam::PreintegrationCombinedParams> m_preintegrationParams;
+  gtsam::NavState m_imuState;
+  std::optional<gtsam::imuBias::ConstantBias> m_imuBias;
+  std::deque<Imu> m_imuBuffer;
+  double m_currentStamp;
+
+  [[nodiscard]] PointLIO() noexcept;
+  
   [[nodiscard]] gtsam::NavState registerImu(const Imu &imu) noexcept;
 
   [[nodiscard]] std::vector<pcl_types::PointXYZICT>
