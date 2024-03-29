@@ -1,0 +1,21 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(Eigen3 3.4 REQUIRED)
+find_dependency(GTSAM 4.2 REQUIRED)
+find_dependency(catkin REQUIRED
+    COMPONENTS
+        roscpp
+        velodyne_msgs
+        sensor_msgs
+        nav_msgs
+        geometry_msgs
+        tf2
+        tf2_ros
+        rosbag
+)
+
+include("${CMAKE_CURRENT_LIST_DIR}/PointLIOTargets.cmake")
+
+check_required_components(PointLIO)
