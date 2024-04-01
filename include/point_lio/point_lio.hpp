@@ -42,6 +42,9 @@ public:
 
   [[nodiscard]] std::vector<pcl_types::PointXYZICT>
   registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
+
+  // Method to convert NavState to StateInfo custom msg type
+  StateInfo NavstateToStateinfo(gtsam::NavState &odometry);
 };
 
 } // namespace point_lio

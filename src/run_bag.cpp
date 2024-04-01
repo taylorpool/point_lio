@@ -3,6 +3,9 @@
 
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+#include <ros/ros.h>
+#include <gtsam/navigation/NavState.h>
+#include 
 
 #include <span>
 #include <thread>
@@ -14,6 +17,13 @@ int main(int argc, char *argv[]) noexcept {
     std::cout << "./run_bag <bag-name>\n";
     return 1;
   }
+
+  // Initializing ROS stuff
+  ros::init(argc, argv, "imu_dead_reckoning");
+  ros::NodeHandle nh;
+
+  // Setting up publishers
+  ros::Publisher imu_pub = nh.advertise<StateInfo>("imu_data",10);
 
   rosbag::Bag bag(argv[1], rosbag::bagmode::Read);
 
@@ -33,6 +43,10 @@ int main(int argc, char *argv[]) noexcept {
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
           const auto odometry = pointLIO.registerImu(imu);
           odometry.print();
+
+          // Converting odometry from NavState type to StateInfo custom msg type and publish it
+          imu_pub.publish(NavstateToStateinfo(odometry));
+
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
       }
@@ -48,6 +62,8 @@ int main(int argc, char *argv[]) noexcept {
       }
     }
   }
+
+  ros::spin();
 
   return 0;
 }
