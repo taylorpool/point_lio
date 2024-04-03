@@ -4,8 +4,8 @@
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
 #include <ros/ros.h>
-#include <gtsam/navigation/NavState.h>
-#include 
+#include <nav_msgs/Odometry.h>
+#include "point_lio/point_lio.hpp"
 
 #include <span>
 #include <thread>
@@ -23,7 +23,10 @@ int main(int argc, char *argv[]) noexcept {
   ros::NodeHandle nh;
 
   // Setting up publishers
-  ros::Publisher imu_pub = nh.advertise<StateInfo>("imu_data",10);
+  ros::Publisher imu_pub = nh.advertise<nav_msgs::Odometry>("imu_data",10);
+
+  // Creating PointLIO class object
+  point_lio::PointLIO pl;
 
   rosbag::Bag bag(argv[1], rosbag::bagmode::Read);
 
@@ -45,7 +48,7 @@ int main(int argc, char *argv[]) noexcept {
           odometry.print();
 
           // Converting odometry from NavState type to StateInfo custom msg type and publish it
-          imu_pub.publish(NavstateToStateinfo(odometry));
+          imu_pub.publish(pl.NavstateToOdometry(odometry));
 
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }

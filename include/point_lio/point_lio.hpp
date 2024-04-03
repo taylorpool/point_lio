@@ -11,6 +11,7 @@
 #include <gtsam/navigation/ImuBias.h>
 
 #include <Eigen/Dense>
+#include <nav_msgs/Odometry.h>
 
 #include <chrono>
 #include <optional>
@@ -44,7 +45,7 @@ public:
   registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
 
   // Method to convert NavState to StateInfo custom msg type
-  StateInfo NavstateToStateinfo(gtsam::NavState &odometry);
+  nav_msgs::Odometry NavstateToOdometry(gtsam::NavState odometry);
 };
 
 } // namespace point_lio

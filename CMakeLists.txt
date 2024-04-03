@@ -23,16 +23,6 @@ find_package(catkin REQUIRED
         tf2
         tf2_ros
         rosbag
-        message_generation
-)
-
-add_message_files(
-    FILES
-        StateInfo.msg
-)
-generate_messages(
-  DEPENDENCIES
-    std_msgs
 )
 
 catkin_package(
@@ -52,7 +42,6 @@ catkin_package(
         tf2
         tf2_ros
         rosbag
-        message_runtime
 )
 
 add_library(PCLTypes
