@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) noexcept {
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
           const auto odometry = pointLIO.registerImu(imu);
           odometry.print();
+          //std::cout<< odometry <<std::endl;
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
       }
