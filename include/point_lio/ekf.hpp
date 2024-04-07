@@ -3,6 +3,8 @@
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <random>
+#include <gtsam/geometry/Rot3.h>
 
 
 namespace point_lio {
@@ -14,14 +16,18 @@ public:
     static const Eigen::MatrixXd Q; // Process noise - diag(12,12)
     static const Eigen::MatrixXd Ra; // Accelerometer Measurement Noise - diag(3,3)
     static const Eigen::MatrixXd Rg; // Gyro Measurement Noise - diag(3,3)
-    static const double Rl; // LiDAR Measurement Noise 
+    static const Eigen::MatrixXd Rl; // LiDAR Measurement Noise 
 
+    static std::default_random_engine gen;
+
+    // std::random_device rd;
+    // std::mt19937 gen(rd()); 
     // Setting mean and stddev
     double mean;
     double stddev;
 
     struct State {
-        Eigen::Vector3d Rot; // Euler angles (rotation)
+        Eigen::Vector3d Rot; // angles (rotation)
         Eigen::Vector3d pos; // position vector
         Eigen::Vector3d V; // velocity vector
         Eigen::Vector3d bg; // gyro bias vector
@@ -29,29 +35,25 @@ public:
         Eigen::Vector3d g; // gravity vector
         Eigen::Vector3d angVel; // angular velocity vector
         Eigen::Vector3d linAcc; // linear acceleration vector
-    }
+    };
     
     struct plane {
         Eigen::VectorXd point;
         Eigen::VectorXd u;
     };
 
-
+    State state;
     // Constructor to initialize P and X
-    EKF() {
-        P.setZero(); 
-        state.Rot.setZero();
-        state.pos.setZero();
-        state.V.setZero();
-        state.bg.setZero();
-        state.ba.setZero();
-        state.g << 0.0, 0.0, -9.81; 
-        state.angVel.setZero();
-        state.linAcc.setZero();
-    };
+    EKF();
 
     // Sampling a point from a Gaussian
     double sampleFromGaussian(double mean, double stddev);
+
+    // Vector to Skew Symm
+    Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d& v);
+
+    // vector to rotation matrix
+    // Eigen::Matrix3d eulerToRotationMatrix(Eigen::Vector3d& euler);
 
     // getting vector X from the State struct
     Eigen::VectorXd stateToVector(State& state);
@@ -60,17 +62,17 @@ public:
     State vectorToState(Eigen::VectorXd& X); 
 
     // Predict step 
-    void predict(State& state, double dt, Eigen::Matrix3d& Rotation, Eigen::MatrixXd& P)  {    
+    void predict(State& state, double dt, Eigen::MatrixXd& P);  
     
     // Checking plane correspondance
     plane planeCorr();
 
     // Update step 
     void updateIMU(State& state, Eigen::VectorXd& IMUState, Eigen::MatrixXd& P);
-    void updateLIDAR(State& state, plane& plane, Eigen::MatrixXd& P) ;
+    void updateLIDAR(State& state, plane plane, Eigen::MatrixXd& P, State& CorrectedIMUState) ;
+
 
 };
+}
 
-}
-}
 #endif

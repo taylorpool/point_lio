@@ -3,33 +3,61 @@
 namespace point_lio {
 
     // TODO: initialization of P, X, Q, Ra, Rg, Rl
+    EKF::EKF() {
+        P.setZero(); 
+        state.Rot.setZero();
+        state.pos.setZero();
+        state.V.setZero();
+        state.bg.setZero();
+        state.ba.setZero();
+        state.g << 0.0, 0.0, -9.81; 
+        state.angVel.setZero();
+        state.linAcc.setZero();
+
+        gen.seed(0);
+    };
 
     
-    double sampleFromGaussian(double mean, double stddev) {
+    double EKF::sampleFromGaussian(double mean, double stddev) { // to define this only once 
     // Function to sample a point from a Gaussian distribution
         
-        std::random_device rd;
-        std::mt19937 gen(rd()); 
-        std::normal_distribution<> dist(mean, stddev); 
+        std::normal_distribution<double> dist(mean, stddev); 
 
         return dist(gen);
     }
 
+    Eigen::Matrix3d EKF::skewSymmetric(const Eigen::Vector3d& v) {
+        Eigen::Matrix3d skew;
+        skew <<  0, -v[2],  v[1],
+                v[2],  0,  -v[0],
+                -v[1],  v[0], 0;
+        return skew;
+    }
 
-    Eigen::VectorXd stateToVector(State& state) {
+
+    // Eigen::Matrix3d EKF::eulerToRotationMatrix(Eigen::Vector3d& euler) {
+    //     double roll = euler(0);
+    //     double pitch = euler(1);
+    //     double yaw = euler(2);
+
+    //     Eigen::Matrix3d rotationMatrix;
+    //     rotationMatrix << cos(yaw)*cos(pitch), cos(yaw)*sin(pitch)*sin(roll) - sin(yaw)*cos(roll), cos(yaw)*sin(pitch)*cos(roll) + sin(yaw)*sin(roll),
+    //                     sin(yaw)*cos(pitch), sin(yaw)*sin(pitch)*sin(roll) + cos(yaw)*cos(roll), sin(yaw)*sin(pitch)*cos(roll) - cos(yaw)*sin(roll),
+    //                     -sin(pitch),          cos(pitch)*sin(roll),                                       cos(pitch)*cos(roll);
+    //     return rotationMatrix;
+    // }
+
+
+    Eigen::VectorXd EKF::stateToVector(EKF::State& state) {
         Eigen::VectorXd X(24);
         X << state.Rot, state.pos, state.V, state.bg, state.ba, state.g, state.angVel, state.linAcc;
         return X;
     }
 
-    State vectorToState(Eigen::VectorXd& X) {
-        // Check if the dimension of X matches the expected state size (24)
-        if (X.rows() != 24) {
-            throw std::invalid_argument("Input vector X has incorrect dimension");
-        }
-
+    EKF::State EKF::vectorToState(Eigen::VectorXd& X) {
+     
         State state;
-        state.Rot = X.block<3, 3>(0, 0);
+        state.Rot = X.block<3, 1>(0, 0);
         state.pos = X.block<3, 1>(3, 0);
         state.V = X.block<3, 1>(6, 0);
         state.bg = X.block<3, 1>(9, 0);
@@ -42,18 +70,14 @@ namespace point_lio {
 
 
 
-    void predict(State& state, double dt, Eigen::Matrix3d& Rotation, Eigen::MatrixXd& P)  {    //TODO: Remove rotation
+    void EKF::predict(EKF::State& state, double dt, Eigen::MatrixXd& P)  {    
     // Predicts the state vector X and covariance P (w/o measurement)
 
         // Initializing dynamic function f as X_dot
         Eigen::VectorXd X_dot(24);
 
         // defines [angVel]
-        // TODO
-        Eigen::Matrix3d angVel_skew = Eigen::Matrix3d::Zero();
-        angVel_skew(0, 1) = -state.angVel(1, 0);
-        angVel_skew(0, 2) = state.angVel(2, 0); 
-        angVel_skew(1, 2) = -state.angVel(2, 1);
+        Eigen::Matrix3d angVel_skew = skewSymmetric(state.angVel);
 
         // defines noises and biases
         Eigen::Vector3d nbg;
@@ -99,20 +123,32 @@ namespace point_lio {
         waz = sampleFromGaussian(0, Qa(2,2));
         wa << wax, way, waz;
 
-        // Rotation(k+1) converted from (3,3) to (3,1)
+        // Rotation(k+1) converted from (3,1) to (3,1) back to (3,1)
         // to be directly used X(k+1)
-        Rotation += (Rotation*angVel_skew)*dt;
-        Eigen::Vector3d euler_angles = Rotation.eulerAngles(0, 1, 2);
+        // Eigen::Matrix3d Rotation; 
+        // Rotation = eulerToRotationMatrix(state.Rot);
+        // Rotation += (Rotation*angVel_skew)*dt;
+        // Eigen::Vector3d euler_angles = Rotation.eulerAngles(0, 1, 2);  // remove euler angles
+        double yaw = state.Rot(0);
+        double pitch = state.Rot(1);
+        double roll = state.Rot(2);
+        gtsam::Rot3 Rot_object = gtsam::Rot3::RzRyRx(yaw, pitch, roll);
+        // Eigen::Matrix3d Rotation = Rot_object.matrix();
+    
 
-        // Setting X_dot        
+        // Setting X_dot    
         X_dot.segment<3>(3) = state.V;
-        X_dot.segment<3>(6) = Rotation * state.a + state.g;
+        X_dot.segment<3>(6) = Rot_object.matrix()*state.linAcc + state.g;
         X_dot.segment<3>(9) = nbg;
         X_dot.segment<3>(12) = nba;
         X_dot.segment<3>(15) = Eigen::Vector3d::Zero();
         X_dot.segment<3>(18) = wg;
         X_dot.segment<3>(21) = wa;
         
+        // Rotation at next step
+        Rot_object.matrix() += (Rot_object.matrix()*angVel_skew)*dt;
+        gtsam::Vector3 euler_angles = Rot_object.rpy();
+
         // Predict the state X(k+1) - discretized model
         Eigen::VectorXd X(24);
         X = stateToVector(state);
@@ -124,17 +160,19 @@ namespace point_lio {
         Eigen::MatrixXd Fw = Eigen::MatrixXd::Zero(24, 12);
 
         // Setting Fx
-        // TODO: define F11, F31, F38
-        Fx.block<3,3>(0,0) = exp(-state.angVel*dt);
-        Fx.block<3,3>(0,18) = dt*Identity(3,3);
-        Fx.block<3,3>(3,6) = dt*Identity(3,3);
-        Fx.block<3,3>(6,0) = F31;
-        Fx.block<3,3>(6,15) = dt*Identity(3,3);
-        Fx.block<3,3>(6,21) = Rotation*dt;
+        // TODO: define F31
+        const gtsam::Rot3 exp = gtsam::Rot3::Expmap(state.angVel*dt);
+
+        Fx.block<3,3>(0,0) = exp.matrix();
+        Fx.block<3,3>(0,18) = dt*Eigen::MatrixXd::Identity(3,3);
+        Fx.block<3,3>(3,6) = dt*Eigen::MatrixXd::Identity(3,3);
+        //Fx.block<3,3>(6,0) = F31;
+        Fx.block<3,3>(6,15) = dt*Eigen::MatrixXd::Identity(3,3);
+        Fx.block<3,3>(6,21) = Rot_object.matrix()*dt;
 
         // Setting Fw
-        Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(Q.cols(), Q.cols());
-        Fw.block<4, 4>(3, 0) = identity;
+        Fw.block<6, 6>(9, 0) = Eigen::MatrixXd::Identity(6, 6);
+        Fw.block<6, 6>(18, 6) = Eigen::MatrixXd::Identity(6, 6);
 
         // Update covariance matrix P - 
         P = Fx*P*Fx.transpose() + Fw*Q*Fw.transpose();
@@ -145,20 +183,21 @@ namespace point_lio {
 
 
 
-    EKF::Plane EKF::PlaneCorr() {
+    EKF::plane EKF::planeCorr() {
     // Checking if LiDAR point p lies in the corresponding plane, given by normal vector u
 
     }
 
 
 
-    void updateIMU(State& state, Eigen::VectorXd& IMUState, Eigen::MatrixXd& P) {   // IMUState should be a (24,1) vector
+    void EKF::updateIMU(EKF::State& state, Eigen::VectorXd& IMUState, Eigen::MatrixXd& P) {   // IMUState should be a (24,1) vector
     // Updates the state vector X and covariance P based on IMU measurement
 
         Eigen::VectorXd X(24);
         X = stateToVector(state);
 
         // error
+        Eigen::VectorXd del_X(24);
         del_X = X - IMUState;
 
         // Jacobians
@@ -205,32 +244,51 @@ namespace point_lio {
         state = vectorToState(X);
 
         // Update covariance matrix P
-        P = (Eigen::MatrixXd::Identity(P.rows(), P.cols()) - K*H)*P;
+        P = (Eigen::MatrixXd::Identity(24,24) - K*H)*P;
     }
 
 
 
-    void updateLIDAR(State& state, plane plane, Eigen::Matrix3d& Rotation, Eigen::MatrixXd& P) {    //TODO: Remove rotation
+    void EKF::updateLIDAR(EKF::State& state, EKF::plane plane, Eigen::MatrixXd& P, EKF::State& CorrectedIMUState) {   
     // Updates the state vector X and covariance P based on LiDAR measurement
+        Eigen::VectorXd X(24);
+        X = stateToVector(state);
 
+        Eigen::Vector3d u;
+        Eigen::Vector3d point;
         u = plane.u;
-        point = plane.point;
+        point = plane.point;  // This is in global frame
+
+        // LidarState 
+        Eigen::VectorXd LidarState = Eigen::VectorXd::Zero(24);
+        Eigen::VectorXd GroundTruth(6); 
+        GroundTruth << CorrectedIMUState.Rot, CorrectedIMUState.pos; 
+        LidarState.segment<6>(0,0) = GroundTruth; 
+
+        // error
+        Eigen::VectorXd del_X(24);
+        del_X = X - LidarState;
+
+        // Eigen::Matrix3d Rotation; 
+        // Rotation = eulerToRotationMatrix(state.Rot);
+        double yaw = state.Rot(0);
+        double pitch = state.Rot(1);
+        double roll = state.Rot(2);
+        gtsam::Rot3 Rot_object = gtsam::Rot3::RzRyRx(yaw, pitch, roll);
+        // Eigen::Matrix3D Rotation = Rot_object.matrix();
+    
 
         // Jacobians
         Eigen::MatrixXd H = Eigen::MatrixXd::Zero(1,24);
         Eigen::MatrixXd D(1,3); 
 
         // defines [p]
-        //TODO
-        Eigen::Matrix3d point_skew = Eigen::Matrix3d::Zero();
-        point_skew(0, 1) = -point(1, 0);
-        point_skew(0, 2) = point(2, 0); 
-        point_skew(1, 2) = -point(2, 1);
+        Eigen::Matrix3d point_skew = skewSymmetric(point);
 
-        H.block<1,3>(0,0) = -u.transpose()*Rotation*point_skew;
+        H.block<1,3>(0,0) = -u.transpose()*Rot_object.matrix()*point_skew;
         H.block<1,3>(0,3) = u.transpose();
 
-        D = -u.transpose()*Rotation; 
+        D = -u.transpose()*Rot_object.matrix(); 
 
         // nl sampled from Rl
         Eigen::Vector3d nl;
@@ -238,9 +296,9 @@ namespace point_lio {
         double nly;
         double nlz;
 
-        nlx = sampleFromGaussian(0, Rl);
-        nly = sampleFromGaussian(0, Rl);
-        nlz = sampleFromGaussian(0, Rl); 
+        nlx = sampleFromGaussian(0, Rl(0,0));
+        nly = sampleFromGaussian(0, Rl(1,1));
+        nlz = sampleFromGaussian(0, Rl(2,2)); 
         nl << nlx, nly, nlz;
 
         // Residual r
@@ -248,7 +306,8 @@ namespace point_lio {
         r = H*del_X + D*nl;
         
         // Kalman gain matrix K
-        Eigen::MatrixXd K = P*H.transpose()*(H*P*H.transpose() + Rl).inverse();
+        Eigen::MatrixXd R = D*Rl*D.transpose();
+        Eigen::MatrixXd K = P*H.transpose()*(H*P*H.transpose() + R).inverse();
 
         // Update state vector X based on the measurement
         X = X + K*r;
