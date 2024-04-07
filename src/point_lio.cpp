@@ -39,4 +39,30 @@ namespace point_lio {
 
 [[nodiscard]] std::vector<pcl_types::PointXYZICT>
 PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {}
+
+nav_msgs::Odometry PointLIO::NavstateToOdometry(gtsam::NavState odometry){
+    nav_msgs::Odometry state;
+
+    Eigen::Vector3d pos = odometry.pose().translation();
+    Eigen::Vector3d vel = odometry.velocity();
+    gtsam::Rot3 rotMat = odometry.pose().rotation();
+    gtsam::Quaternion quat = rotMat.toQuaternion();
+
+    
+
+    state.pose.pose.position.x = pos.x();
+    state.pose.pose.position.y = pos.y();
+    state.pose.pose.position.z = pos.z();
+
+    state.twist.twist.linear.x = vel.x();
+    state.twist.twist.linear.y = vel.y();
+    state.twist.twist.linear.z = vel.z();
+
+    state.pose.pose.orientation.w = quat.w();
+    state.pose.pose.orientation.x = quat.x();
+    state.pose.pose.orientation.y = quat.y();
+    state.pose.pose.orientation.z = quat.z();
+
+    return state;
+}
 } // namespace point_lio

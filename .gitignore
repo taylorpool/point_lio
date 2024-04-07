@@ -2,6 +2,7 @@ build
 .cache
 result
 .vscode/
+<<<<<<< HEAD
 CATKIN_IGNORE
 CMakeCache.txt
 CMakeFiles/
@@ -14,4 +15,4 @@ catkin/
 catkin_generated/
 cmake_install.cmake
 devel/
-
+bagfiles/
