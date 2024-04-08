@@ -20,8 +20,6 @@ public:
 
     static std::default_random_engine gen;
 
-    // std::random_device rd;
-    // std::mt19937 gen(rd()); 
     // Setting mean and stddev
     double mean;
     double stddev;
@@ -43,6 +41,9 @@ public:
     };
 
     State state;
+
+    State CorrectedIMUState; // Ground truth for updateLIDAR
+    
     // Constructor to initialize P and X
     EKF();
 
@@ -69,8 +70,7 @@ public:
 
     // Update step 
     void updateIMU(State& state, Eigen::VectorXd& IMUState, Eigen::MatrixXd& P);
-    void updateLIDAR(State& state, plane plane, Eigen::MatrixXd& P, State& CorrectedIMUState) ;
-
+    void updateLIDAR(State& state, plane plane, Eigen::MatrixXd& P, State& CorrectedIMUState);
 
 };
 }

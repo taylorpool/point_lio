@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
       "/cmu_rc2/imu/data", 10, [&](const sensor_msgs::Imu::ConstPtr &imuMsg) {
         point_lio::Imu imu;
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
-          const auto odometry = pointLIO.registerImu(imu);
+          const auto odometry = pointLIO.registerImu(pointLIO.imu_state, imu);
         }
       });
 

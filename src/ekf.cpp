@@ -68,8 +68,6 @@ namespace point_lio {
         return state;
     }
 
-
-
     void EKF::predict(EKF::State& state, double dt, Eigen::MatrixXd& P)  {    
     // Predicts the state vector X and covariance P (w/o measurement)
 
@@ -243,11 +241,11 @@ namespace point_lio {
         X = X + K*r;
         state = vectorToState(X);
 
+        CorrectedIMUState = state; // Ground truth for updateLIDAR
+
         // Update covariance matrix P
         P = (Eigen::MatrixXd::Identity(24,24) - K*H)*P;
     }
-
-
 
     void EKF::updateLIDAR(EKF::State& state, EKF::plane plane, Eigen::MatrixXd& P, EKF::State& CorrectedIMUState) {   
     // Updates the state vector X and covariance P based on LiDAR measurement

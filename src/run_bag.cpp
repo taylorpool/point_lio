@@ -25,18 +25,21 @@ int main(int argc, char *argv[]) noexcept {
   // Setting up publishers
   ros::Publisher imu_pub = nh.advertise<nav_msgs::Odometry>("imu_data",10);
 
-  // Creating PointLIO class object
-  point_lio::PointLIO pl;
-
   rosbag::Bag bag(argv[1], rosbag::bagmode::Read);
 
   std::vector<std::string> topics{"/cmu_rc2/imu/data",
                                   "/cmu_rc2/velodyne_packets/point_cloud"};
 
+  // Creating PointLIO class object
   point_lio::PointLIO pointLIO;
+
+  // Creating EKF class object
+  point_lio::EKF ekf;
 
   for (const auto &msg : rosbag::View(bag)) {
     const auto dataType = msg.getDataType();
+
+    ekf.predict(ekf.state, pointLIO.delt, ekf.P);
 
     if(dataType == "sensor_msgs/Imu")
     {
@@ -44,10 +47,12 @@ int main(int argc, char *argv[]) noexcept {
       if (imuMsg != nullptr) {
         point_lio::Imu imu;
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
-          const auto odometry = pointLIO.registerImu(imu);
+          const auto odometry = pointLIO.registerImu(pointLIO.imu_state, imu);
           odometry.print();
           // Converting odometry from NavState type to StateInfo custom msg type and publish it
-          imu_pub.publish(pl.NavstateToOdometry(odometry));
+          imu_pub.publish(pointLIO.NavstateToOdometry(odometry));
+
+          ekf.updateIMU(ekf.state, pointLIO.imu_state, ekf.P);
 
           std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -60,6 +65,8 @@ int main(int argc, char *argv[]) noexcept {
         pcl_types::LidarScanStamped scan;
         if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
           const auto map = pointLIO.registerScan(scan);
+
+          ekf.updateLIDAR(ekf.state, ekf.plane, ekf.P, ekf.CorrectedIMUState);
         }
       }
     }
