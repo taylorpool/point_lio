@@ -1,3 +1,18 @@
 build
 .cache
 result
+.vscode/
+<<<<<<< HEAD
+CATKIN_IGNORE
+CMakeCache.txt
+CMakeFiles/
+CTestConfiguration.ini
+CTestCustom.cmake
+CTestTestfile.cmake
+Makefile
+atomic_configure/
+catkin/
+catkin_generated/
+cmake_install.cmake
+devel/
+bagfiles/
