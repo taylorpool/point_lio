@@ -1,78 +1,68 @@
-#ifndef POINT_LIO_EKF_HPP
-#define POINT_LIO_EKF_HPP
+// #ifndef POINT_LIO_EKF_HPP
+// #define POINT_LIO_EKF_HPP
 
-#include <Eigen/Dense>
-#include <cmath>
-#include <random>
-#include <gtsam/geometry/Rot3.h>
+// #include <Eigen/Dense>
+// #include <cmath>
+// #include <gtsam/geometry/Rot3.h>
+// #include <random>
 
+// namespace point_lio {
 
-namespace point_lio {
+// class EKF {
+// public:
+//   // Setting mean and stddev
+//   double mean;
+//   double stddev;
 
+//   struct State {
+//     Eigen::Vector3d Rot;    // angles (rotation)
+//     Eigen::Vector3d pos;    // position vector
+//     Eigen::Vector3d V;      // velocity vector
+//     Eigen::Vector3d bg;     // gyro bias vector
+//     Eigen::Vector3d ba;     // accelerometer bias vector
+//     Eigen::Vector3d g;      // gravity vector
+//     Eigen::Vector3d angVel; // angular velocity vector
+//     Eigen::Vector3d linAcc; // linear acceleration vector
+//   };
 
-class EKF{
-public:
-    Eigen::MatrixXd P; // Initial covariance matrix - (24,24)
-    static const Eigen::MatrixXd Q; // Process noise - diag(12,12)
-    static const Eigen::MatrixXd Ra; // Accelerometer Measurement Noise - diag(3,3)
-    static const Eigen::MatrixXd Rg; // Gyro Measurement Noise - diag(3,3)
-    static const Eigen::MatrixXd Rl; // LiDAR Measurement Noise 
+//   struct plane {
+//     Eigen::VectorXd point;
+//     Eigen::VectorXd u;
+//   };
 
-    static std::default_random_engine gen;
+//   State state;
 
-    // Setting mean and stddev
-    double mean;
-    double stddev;
+//   State CorrectedIMUState; // Ground truth for updateLIDAR
 
-    struct State {
-        Eigen::Vector3d Rot; // angles (rotation)
-        Eigen::Vector3d pos; // position vector
-        Eigen::Vector3d V; // velocity vector
-        Eigen::Vector3d bg; // gyro bias vector
-        Eigen::Vector3d ba; // accelerometer bias vector
-        Eigen::Vector3d g; // gravity vector
-        Eigen::Vector3d angVel; // angular velocity vector
-        Eigen::Vector3d linAcc; // linear acceleration vector
-    };
-    
-    struct plane {
-        Eigen::VectorXd point;
-        Eigen::VectorXd u;
-    };
+//   // Constructor to initialize P and X
+//   EKF();
 
-    State state;
+//   // Sampling a point from a Gaussian
+//   double sampleFromGaussian(double mean, double stddev);
 
-    State CorrectedIMUState; // Ground truth for updateLIDAR
-    
-    // Constructor to initialize P and X
-    EKF();
+//   // Vector to Skew Symm
+//   Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d &v);
 
-    // Sampling a point from a Gaussian
-    double sampleFromGaussian(double mean, double stddev);
+//   // vector to rotation matrix
+//   // Eigen::Matrix3d eulerToRotationMatrix(Eigen::Vector3d& euler);
 
-    // Vector to Skew Symm
-    Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d& v);
+//   // getting vector X from the State struct
+//   Eigen::VectorXd stateToVector(State &state);
 
-    // vector to rotation matrix
-    // Eigen::Matrix3d eulerToRotationMatrix(Eigen::Vector3d& euler);
+//   // getting struct State from vector X
+//   State vectorToState(Eigen::VectorXd &X);
 
-    // getting vector X from the State struct
-    Eigen::VectorXd stateToVector(State& state);
+//   // Predict step
+//   void predict(State &state, double dt, Eigen::MatrixXd &P);
 
-    // getting struct State from vector X
-    State vectorToState(Eigen::VectorXd& X); 
+//   // Checking plane correspondance
+//   plane planeCorr();
 
-    // Predict step 
-    void predict(State& state, double dt, Eigen::MatrixXd& P);  
-    
-    // Checking plane correspondance
-    plane planeCorr();
+//   // Update step
+//   void updateIMU(State &state, Eigen::VectorXd &IMUState, Eigen::MatrixXd
+//   &P); void updateLIDAR(State &state, plane plane, Eigen::MatrixXd &P,
+//                    State &CorrectedIMUState);
+// };
+// } // namespace point_lio
 
-    // Update step 
-    void updateIMU(State& state, Eigen::VectorXd& IMUState, Eigen::MatrixXd& P);
-    void updateLIDAR(State& state, plane plane, Eigen::MatrixXd& P, State& CorrectedIMUState);
-
-};
-}
-
-#endif
+// #endif

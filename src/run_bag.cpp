@@ -1,78 +1,67 @@
 #include "pcl_types/pcl_types_ros1.hpp"
 #include "point_lio_ros1/point_lio_ros1.hpp"
 
+#include "point_lio/point_lio.hpp"
+#include <nav_msgs/Odometry.h>
+#include <ros/ros.h>
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
-#include <ros/ros.h>
-#include <nav_msgs/Odometry.h>
-#include "point_lio/point_lio.hpp"
 
 #include <span>
-#include <thread>
 
 int main(int argc, char *argv[]) noexcept {
   const std::span args(argv, argc);
 
-  if (args.size() < 2) {
-    std::cout << "./run_bag <bag-name>\n";
+  if (args.size() < 3) {
+    std::cout << "./run_bag <input-bag-name> <output-bag-name>\n";
     return 1;
   }
 
-  // Initializing ROS stuff
-  ros::init(argc, argv, "imu_dead_reckoning");
-  ros::NodeHandle nh;
+  const std::string odometryTopic = "/odometry";
 
-  // Setting up publishers
-  ros::Publisher imu_pub = nh.advertise<nav_msgs::Odometry>("imu_data",10);
+  rosbag::Bag inputbag(argv[1], rosbag::bagmode::Read);
+  rosbag::Bag outputBag(argv[2], rosbag::bagmode::Write);
 
-  rosbag::Bag bag(argv[1], rosbag::bagmode::Read);
-
-  std::vector<std::string> topics{"/cmu_rc2/imu/data",
-                                  "/cmu_rc2/velodyne_packets/point_cloud"};
-
-  // Creating PointLIO class object
   point_lio::PointLIO pointLIO;
 
-  // Creating EKF class object
-  point_lio::EKF ekf;
-
-  for (const auto &msg : rosbag::View(bag)) {
+  for (const auto &msg : rosbag::View(inputbag)) {
+    const auto topic = msg.getTopic();
     const auto dataType = msg.getDataType();
 
-    ekf.predict(ekf.state, pointLIO.delt, ekf.P);
-
-    if(dataType == "sensor_msgs/Imu")
-    {
+    if (dataType == "sensor_msgs/Imu") {
       const auto imuMsg = msg.instantiate<sensor_msgs::Imu>();
       if (imuMsg != nullptr) {
         point_lio::Imu imu;
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
-          const auto odometry = pointLIO.registerImu(pointLIO.imu_state, imu);
-          odometry.print();
-          // Converting odometry from NavState type to StateInfo custom msg type and publish it
-          imu_pub.publish(pointLIO.NavstateToOdometry(odometry));
+          pointLIO.registerImu(imu);
 
-          ekf.updateIMU(ekf.state, pointLIO.imu_state, ekf.P);
+          {
+            nav_msgs::Odometry odomMsg;
+            odomMsg.header.frame_id = "world";
+            odomMsg.header.stamp = imuMsg->header.stamp;
+            odomMsg.pose.pose.position.x = pointLIO.world_position.x();
+            odomMsg.pose.pose.position.y = pointLIO.world_position.y();
+            odomMsg.pose.pose.position.z = pointLIO.world_position.z();
+            const auto tmp = pointLIO.world_R_body.toQuaternion();
+            odomMsg.pose.pose.orientation.w = tmp.w();
+            odomMsg.pose.pose.orientation.x = tmp.x();
+            odomMsg.pose.pose.orientation.y = tmp.y();
+            odomMsg.pose.pose.orientation.z = tmp.z();
 
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            outputBag.write(odometryTopic, msg.getTime(), odomMsg);
+          }
         }
       }
-    }
-    else if(dataType == "sensor_msgs/PointCloud")
-    {
+    } else if (dataType == "sensor_msgs/PointCloud") {
       const auto scanMsg = msg.instantiate<sensor_msgs::PointCloud2>();
       if (scanMsg != nullptr) {
         pcl_types::LidarScanStamped scan;
         if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
-          const auto map = pointLIO.registerScan(scan);
-
-          ekf.updateLIDAR(ekf.state, ekf.plane, ekf.P, ekf.CorrectedIMUState);
+          pointLIO.registerScan(scan);
         }
       }
     }
   }
-
-  ros::spin();
 
   return 0;
 }

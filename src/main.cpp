@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
       "/cmu_rc2/imu/data", 10, [&](const sensor_msgs::Imu::ConstPtr &imuMsg) {
         point_lio::Imu imu;
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
-          const auto odometry = pointLIO.registerImu(pointLIO.imu_state, imu);
+          pointLIO.registerImu(imu);
         }
       });
 
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
       [&](const sensor_msgs::PointCloud2::ConstPtr &scanMsg) {
         pcl_types::LidarScanStamped scan;
         if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
-          const auto map = pointLIO.registerScan(scan);
+          pointLIO.registerScan(scan);
         }
       });
 

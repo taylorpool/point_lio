@@ -6,9 +6,9 @@
 
 #include "pcl_types/pcl_types.hpp"
 
-#include <gtsam/navigation/NavState.h>
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/ImuBias.h>
+#include <gtsam/navigation/NavState.h>
 
 #include <Eigen/Dense>
 #include <nav_msgs/Odometry.h>
@@ -28,42 +28,60 @@ struct Imu {
   Eigen::Vector3d body_measuredAngularVelocity;
 };
 
-struct Imu_State {
-    Eigen::Vector3d Rot; // angles (rotation)
-    Eigen::Vector3d pos; // position vector
-    Eigen::Vector3d V; // velocity vector
-    Eigen::Vector3d bg; // gyro bias vector
-    Eigen::Vector3d ba; // accelerometer bias vector
-    Eigen::Vector3d g; // gravity vector
-    Eigen::Vector3d angVel; // angular velocity vector
-    Eigen::Vector3d linAcc; // linear acceleration vector
+[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v);
+
+struct PointLIOParams {
+  size_t imuInitializationQuota;
 };
 
 class PointLIO {
 public:
-  size_t m_imuInitializationQuota;
-  boost::shared_ptr<gtsam::PreintegrationCombinedParams> m_preintegrationParams;
-  gtsam::NavState m_imuState;
-  std::optional<gtsam::imuBias::ConstantBias> m_imuBias;
+  PointLIOParams m_params;
+
   std::deque<Imu> m_imuBuffer;
-  double m_currentStamp;
 
-  Imu_State imu_state;
+  Stamp stamp;
+  gtsam::Rot3 world_R_body;
+  Eigen::Vector3d world_position;
+  Eigen::Vector3d world_linearVelocity;
+  std::optional<Eigen::Vector3d> imuBias_gyroscope;
+  std::optional<Eigen::Vector3d> imuBias_accelerometer;
+  Eigen::Vector3d world_gravity;
+  Eigen::Vector3d body_angularVelocity;
+  Eigen::Vector3d body_linearAcceleration;
 
-  double delt;
+  Eigen::Matrix<double, 6, 6> R_imu;
 
+  Eigen::Matrix<double, 12, 12> Q;
+
+  Eigen::Matrix<double, 24, 12> Fw;
+
+  Eigen::Matrix<double, 24, 24> covariance;
+
+  // Constants
+  static constexpr int world_R_body_index = 0;
+  static constexpr int world_position_index = 3;
+  static constexpr int world_linearVelocity_index = 6;
+  static constexpr int imuBias_index = 9;
+  static constexpr int world_gravity_index = 15;
+  static constexpr int body_angularVelocity_index = 18;
+  static constexpr int body_linearAcceleration_index = 21;
+
+  static constexpr int noise_bias_gyroscope_index = 0;
+  static constexpr int noise_bias_accelerometer_index = 3;
+  static constexpr int noise_gyroscope_index = 6;
+  static constexpr int noise_accelerometer_index = 9;
+
+  // Methods
   [[nodiscard]] PointLIO() noexcept;
-  
-  [[nodiscard]] gtsam::NavState registerImu(Imu_State& imu_state, const Imu &imu) noexcept;
 
-  [[nodiscard]] std::vector<pcl_types::PointXYZICT>
-  registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
+  void registerImu(const Imu &imu) noexcept;
 
-  // Method to convert NavState to StateInfo custom msg type
-  nav_msgs::Odometry NavstateToOdometry(gtsam::NavState odometry);
+  void registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
 
-  // void getImu_State(Imu_State& imu_state, const Imu &imu);
+  void registerPoint(const pcl_types::PointXYZICT &point) noexcept;
 
+  void propagateForwardInPlace(const double stamp) noexcept;
 };
 
 } // namespace point_lio
