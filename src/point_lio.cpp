@@ -44,6 +44,11 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
   R_imu(4, 4) = 1e-9;
   R_imu(5, 5) = 1e-9;
 
+  R_lidar = Eigen::Matrix<double, 3, 3>::Zero();
+  R_lidar(0, 0) = 1e-9;
+  R_lidar(1, 1) = 1e-9;
+  R_lidar(2, 2) = 1e-9;
+
   Q = Eigen::Matrix<double, 12, 12>::Zero();
   Q.block<3, 3>(noise_bias_gyroscope_index, noise_bias_gyroscope_index) =
       Eigen::Matrix3d::Identity() * 0.00001;
@@ -161,7 +166,54 @@ void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
   }
 }
 
-void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {}
+void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
+  propagateForwardInPlace(imu.stamp); //TODO: point.stamp
+
+  //TODO: Plane Correspondence
+  Eigen::Vector4d planeCoeffs = ;
+  Eigen::Vector<double, 3> plane_normal = computeNormalVector(planeCoeffs);
+  Eigen::Vector<double, 3> point_in_plane;
+
+
+  Eigen::Matrix<double, 1, 24> H;
+  H.block<1, 18>(0, 6).array() = 0.0;
+  H.block<1,3>(0,0) = -u.transpose()*world_R_body.matrix()*skewSymmetric(point);
+  H.block<1,3>(0,3) = u.transpose();
+
+  Eigen::MatrixXd D(1,3);
+  D = -u.transpose()*world_R_body.matrix();
+
+  Eigen::Vector<double, 6> residual;
+  residual = -plane_normal.transpose()*(world_R_body*point + world_position - point_in_plane);
+
+  const Eigen::Matrix<double, 24, 1> covariance_H_t =
+      covariance * H.transpose();
+
+  const Eigen::Matrix<double, 1, 1> S =
+      H * covariance_H_t + D * R_lidar * D.transpose();
+
+  const auto SLLT = S.llt();
+  const Eigen::Vector<double, 24> delta_state =
+      covariance_H_t * SLLT.solve(residual);
+
+  // TODO finish covariance and state update
+  covariance -= covariance_H_t * SLLT.solve(H) * covariance;
+
+  // TODO Estimate theta
+  Eigen::Vector3d theta = gtsam::Rot3::Logmap();
+  double norm_theta_div_2 = theta.norm() / 2.0;
+  Eigen::Matrix<double, 24, 24> Jt;
+  Jt.block<3, 3>(0, 0) =
+      Eigen::Matrix3d::Identity() - skewSymmetric(theta / 2.0) +
+      (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
+                  std::sin(norm_theta_div_2)) *
+          skewSymmetric(theta) / theta.norm();
+  Jt.block<3, 21>(0, 3).array() = 0.0;
+  Jt.block<21, 3>(3, 0).array() = 0.0;
+  Jt.block<21, 21>(3, 3) = Eigen::Matrix<double, 21, 21>::Identity();
+  covariance = Jt.transpose() * covariance * Jt;
+
+}
 
 void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
   const double dt = stamp - _stamp;
@@ -190,6 +242,13 @@ void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
   world_position += world_linearVelocity * dt;
   world_linearVelocity +=
       (world_R_body * body_linearAcceleration + world_gravity) * dt;
+}
+
+Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs) {
+    Eigen::Vector<double, 3> normalVec;
+    normalVec << planeCoeffs(0), planeCoeffs(1), planeCoeffs(2);
+    normalVec.normalize();
+    return normalVec;
 }
 
 } // namespace point_lio

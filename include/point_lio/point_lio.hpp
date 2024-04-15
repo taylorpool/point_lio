@@ -82,6 +82,8 @@ public:
   void registerPoint(const pcl_types::PointXYZICT &point) noexcept;
 
   void propagateForwardInPlace(const double stamp) noexcept;
+
+  Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs);
 };
 
 } // namespace point_lio
