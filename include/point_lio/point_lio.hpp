@@ -50,7 +50,11 @@ public:
   Eigen::Vector3d body_angularVelocity;
   Eigen::Vector3d body_linearAcceleration;
 
+  gtsam::Rot3 world_R_body_hat;
+
   Eigen::Matrix<double, 6, 6> R_imu;
+
+  Eigen::Matrix<double, 3, 3> R_lidar;
 
   Eigen::Matrix<double, 12, 12> Q;
 
@@ -83,7 +87,9 @@ public:
 
   void propagateForwardInPlace(const double stamp) noexcept;
 
-  Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs);
+  // Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs);
+
+  Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd& points);
 };
 
 } // namespace point_lio

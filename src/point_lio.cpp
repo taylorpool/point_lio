@@ -78,6 +78,8 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
 }
 
 void PointLIO::registerImu(const Imu &imu) noexcept {
+
+  // Estimate IMU biases by assuming the robot is standing still
   if (!imuBias_gyroscope || !imuBias_accelerometer) {
     if (m_imuBuffer.empty() || m_imuBuffer.back().stamp < imu.stamp) {
       m_imuBuffer.push_back(imu);
@@ -102,7 +104,7 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
             return imu.body_measuredAngularVelocity / m_imuBuffer.size();
           });
 
-      const gtsam::Rot3 roll_R_body = compute_plane_R_vec(
+      const gtsam::Rot3 roll_R_body = compute_plane_R_vec(        // Zero yaw
           {0.0, 1.0, 0.0}, body_meanMeasuredLinearAcceleration);
       const gtsam::Rot3 world_R_roll = compute_plane_R_vec(
           {1.0, 0.0, 0.0}, roll_R_body * body_meanMeasuredLinearAcceleration);
@@ -141,17 +143,27 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     const Eigen::Vector<double, 24> delta_state =
         covariance_H_t * SLLT.solve(residual);
 
-    // TODO finish covariance and state update
-    covariance -= covariance_H_t * SLLT.solve(H) * covariance;
+    world_R_body_hat = world_R_body;
 
-    // TODO Estimate theta
-    Eigen::Vector3d theta = gtsam::Rot3::Logmap();
+    // Covariance and state update
+    covariance -= covariance_H_t * SLLT.solve(H) * covariance;
+    
+    world_R_body = world_R_body * gtsam::Rot3::Expmap(delta_state.segment<3>(0));
+    world_position += delta_state.segment<3>(3);
+    world_linearVelocity += delta_state.segment<3>(6);
+    imuBias_gyroscope.value() += delta_state.segment<3>(9);
+    imuBias_accelerometer.value() += delta_state.segment<3>(12);
+    body_angularVelocity += delta_state.segment<3>(18);
+    body_linearAcceleration += delta_state.segment<3>(21);
+
+    // Estimate theta
+    Eigen::Vector3d theta = gtsam::Rot3::Logmap(world_R_body*world_R_body_hat);
     double norm_theta_div_2 = theta.norm() / 2.0;
     Eigen::Matrix<double, 24, 24> Jt;
     Jt.block<3, 3>(0, 0) =
         Eigen::Matrix3d::Identity() - skewSymmetric(theta / 2.0) +
         (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
-                   std::sin(norm_theta_div_2)) *
+                    std::sin(norm_theta_div_2)) *
             skewSymmetric(theta) / theta.norm();
     Jt.block<3, 21>(0, 3).array() = 0.0;
     Jt.block<21, 3>(3, 0).array() = 0.0;
@@ -167,24 +179,24 @@ void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
 }
 
 void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
-  propagateForwardInPlace(imu.stamp); //TODO: point.stamp
+  
+  propagateForwardInPlace(1); //TODO: point.stamp
 
-  //TODO: Plane Correspondence
-  Eigen::Vector4d planeCoeffs = ;
-  Eigen::Vector<double, 3> plane_normal = computeNormalVector(planeCoeffs);
-  Eigen::Vector<double, 3> point_in_plane;
-
+  // TODO: Plane Correspondence
+  Eigen::MatrixXd nearest_points = KDTree(point);
+  Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
+  Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1,3>(0,0); // Taking the first point from the 5 nearest points
 
   Eigen::Matrix<double, 1, 24> H;
   H.block<1, 18>(0, 6).array() = 0.0;
-  H.block<1,3>(0,0) = -u.transpose()*world_R_body.matrix()*skewSymmetric(point);
-  H.block<1,3>(0,3) = u.transpose();
+  H.block<1,3>(0,0) = -plane_normal.transpose()*world_R_body.matrix()*skewSymmetric(Eigen::Vector3d(point.x, point.y, point.z));
+  H.block<1,3>(0,3) = plane_normal.transpose();
 
   Eigen::MatrixXd D(1,3);
-  D = -u.transpose()*world_R_body.matrix();
+  D = -plane_normal.transpose()*world_R_body.matrix();
 
   Eigen::Vector<double, 6> residual;
-  residual = -plane_normal.transpose()*(world_R_body*point + world_position - point_in_plane);
+  residual = -plane_normal.transpose()*(world_R_body.matrix()*Eigen::Vector3d(point.x, point.y, point.z) + world_position - point_in_plane);
 
   const Eigen::Matrix<double, 24, 1> covariance_H_t =
       covariance * H.transpose();
@@ -196,11 +208,21 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
   const Eigen::Vector<double, 24> delta_state =
       covariance_H_t * SLLT.solve(residual);
 
-  // TODO finish covariance and state update
-  covariance -= covariance_H_t * SLLT.solve(H) * covariance;
+  world_R_body_hat = world_R_body;
 
-  // TODO Estimate theta
-  Eigen::Vector3d theta = gtsam::Rot3::Logmap();
+  // Covariance and state update
+  covariance -= covariance_H_t * SLLT.solve(H) * covariance;
+  
+  world_R_body = world_R_body * gtsam::Rot3::Expmap(delta_state.segment<3>(0));
+  world_position += delta_state.segment<3>(3);
+  world_linearVelocity += delta_state.segment<3>(6);
+  imuBias_gyroscope.value() += delta_state.segment<3>(9);
+  imuBias_accelerometer.value() += delta_state.segment<3>(12);
+  body_angularVelocity += delta_state.segment<3>(18);
+  body_linearAcceleration += delta_state.segment<3>(21);
+
+  // Estimate theta
+  Eigen::Vector3d theta = gtsam::Rot3::Logmap(world_R_body*world_R_body_hat);
   double norm_theta_div_2 = theta.norm() / 2.0;
   Eigen::Matrix<double, 24, 24> Jt;
   Jt.block<3, 3>(0, 0) =
@@ -244,11 +266,23 @@ void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
       (world_R_body * body_linearAcceleration + world_gravity) * dt;
 }
 
-Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs) {
-    Eigen::Vector<double, 3> normalVec;
-    normalVec << planeCoeffs(0), planeCoeffs(1), planeCoeffs(2);
-    normalVec.normalize();
-    return normalVec;
+// Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs) {
+//     Eigen::Vector<double, 3> normalVec;
+//     normalVec << planeCoeffs(0), planeCoeffs(1), planeCoeffs(2);
+//     normalVec.normalize();
+//     return normalVec;
+// }
+
+Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd& points) {
+    // Center the points
+    Eigen::Vector3d centroid = points.colwise().mean();
+    Eigen::MatrixXd centered = points.rowwise() - centroid.transpose();
+
+    // Compute SVD
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(centered, Eigen::ComputeThinV);
+    Eigen::Vector3d normal = svd.matrixV().col(2); // Right singular vector corresponding to smallest singular value
+
+    return normal;
 }
 
 } // namespace point_lio
