@@ -195,7 +195,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
   Eigen::MatrixXd D(1,3);
   D = -plane_normal.transpose()*world_R_body.matrix();
 
-  Eigen::Vector<double, 6> residual;
+  Eigen::Vector<double, 1> residual;
   residual = -plane_normal.transpose()*(world_R_body.matrix()*Eigen::Vector3d(point.x, point.y, point.z) + world_position - point_in_plane);
 
   const Eigen::Matrix<double, 24, 1> covariance_H_t =
