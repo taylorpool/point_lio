@@ -183,7 +183,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
   propagateForwardInPlace(1); //TODO: point.stamp
 
   // TODO: Plane Correspondence
-  Eigen::MatrixXd nearest_points = KDTree(point);
+  Eigen::MatrixXd nearest_points = KDT.findNearestNeighbors(point);
   Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
   Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1,3>(0,0); // Taking the first point from the 5 nearest points
 
@@ -252,7 +252,7 @@ void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
   Fx.block<3, 3>(world_position_index, world_linearVelocity_index) = I3dt;
 
   // TODO
-  Fx.block<3, 3>(world_linearVelocity_index, world_R_body_index) = world_R_body.matrix()*body_linearAcceleration*dt;
+  Fx.block<3, 3>(world_linearVelocity_index, world_R_body_index) = world_R_body.matrix()*skewSymmetric(body_linearAcceleration)*dt;
   Fx.block<3, 3>(world_linearVelocity_index, world_gravity_index) = I3dt;
 
   Fx.block<3, 3>(world_linearVelocity_index, body_linearAcceleration_index) =

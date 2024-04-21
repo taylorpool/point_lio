@@ -6,6 +6,8 @@
 
 #include "pcl_types/pcl_types.hpp"
 
+#include "incremental_kd_tree.hpp"
+
 #include <gtsam/navigation/CombinedImuFactor.h>
 #include <gtsam/navigation/ImuBias.h>
 #include <gtsam/navigation/NavState.h>
@@ -15,6 +17,7 @@
 
 #include <chrono>
 #include <optional>
+
 
 namespace point_lio {
 
@@ -39,6 +42,8 @@ public:
   PointLIOParams m_params;
 
   std::deque<Imu> m_imuBuffer;
+  
+  point_lio::KDTree KDT;  
 
   Stamp stamp;
   gtsam::Rot3 world_R_body;
