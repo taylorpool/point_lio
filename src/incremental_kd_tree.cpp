@@ -6,29 +6,12 @@ Node::Node(Eigen::Vector3d point)
     : point(point), left(nullptr), right(nullptr) {}
 
 Node::Ptr newNode(Eigen::Vector3d point) {
-  Node::Ptr temp = new Node;
+  Node::Ptr temp = new Node(point);
   temp->point = point;
   temp->left = NULL;
   temp->right = NULL;
 
   return temp;
-}
-
-Node::Ptr insertRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
-  if (root == NULL)
-    return newNode(point);
-
-  unsigned cd = depth % k;
-  if (point[cd] < (root->point[cd]))
-    root->left = insertRec(root->left, point, depth + 1);
-  else
-    root->right = insertRec(root->right, point, depth + 1);
-
-  return root;
-}
-
-Node::Ptr insert(Node::Ptr root, Eigen::Vector3d point) {
-  return insertRec(root, point, 0);
 }
 
 int treeSize(Node::Ptr root) {
@@ -49,20 +32,19 @@ int treeRight(Node::Ptr root) {
   if (root == nullptr) {
     return 0;
   }
-  return treeSize(root->right);
+void lockUpdates(float root) { treeMutex.lock(); }
+void unlockUpdates() { treeMutex.unlock(); }
 }
 
-Node::Ptr build(const std::vector<Eigen::Vector3d> &v) {
-  Node::Ptr root = nullptr;
-  for (auto &point : v) {
-    int arr[k];
-    for (int i = 0; i < k; i++) {
-      arr[i] = point[i];
+Node::Ptr build(const std::vector<Eigen::Vector3d>& v) {
+    Node::Ptr root = nullptr;
+    for (auto& point : v) {
+        root = insert(root, point);
     }
-    root = insert(root, arr);
-  }
-  return root;
-}
+    return root;
+} 
+void lockUpdates( { treeMutex.lock(); }
+void unlockUpdates() { treeMutex.unlock(); }
 
 void KDTree::incrementalUpdates(
     Node::Ptr root, const std::pair<Eigen::Vector3d, bool> &operation,
@@ -73,13 +55,9 @@ void KDTree::incrementalUpdates(
   if (insertOperation) {
     root = insert(root, point);
   } else {
-    if (searchRec(root, point, 0)) {
-      root = removeNode(root, point, 0);
-    }
-  }
-  if (updateLogger) {
-    operationLogger.push_back(operation);
-  }
+    if (searchRec(root, point, 0))
+void lockUpdates(float root) { treeMutex.lock(); }
+void unlockUpdates() { treeMutex.unlock(); }
   if (updateLogger) {
     operationLogger.push_back(operation);
   }
@@ -91,8 +69,8 @@ Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
 
   unsigned cd = depth % k;
 
-  if (arePointsSame(root->point, point)) {
-    if (root->left == nullptr && root->right == nullptr) {
+void lockUpdates(float root) { treeMutex.lock(); }
+void unlockUpdates() { treeMutex.unlock(); }root->right == nullptr) {
       delete root;
       return nullptr;
     }
@@ -119,6 +97,24 @@ Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
 
   return root;
 }
+
+std::vector<Eigen::Vector3d> flatten(Node *root) {
+  std::vector<Eigen::Vector3d> points;
+  std::function<void(Node *)> traverse = [&](Node *node) {
+    if (node == nullptr) {
+      return;
+    }
+    points.push_back(node->point);
+    traverse(node->left);
+    traverse(node->right);
+  };
+  traverse(root);
+  return points;
+}
+
+
+void lockUpdates(float root) { treeMutex.lock(); }
+void unlockUpdates() { treeMutex.unlock(); }
 
 void parRebuild(Node::Ptr root) {
   lockUpdates(root);

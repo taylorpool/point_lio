@@ -252,7 +252,7 @@ void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
   Fx.block<3, 3>(world_position_index, world_linearVelocity_index) = I3dt;
 
   // TODO
-  Fx.block<3, 3>(world_linearVelocity_index, world_R_body_index) = I3;
+  Fx.block<3, 3>(world_linearVelocity_index, world_R_body_index) = world_R_body.matrix()*body_linearAcceleration*dt;
   Fx.block<3, 3>(world_linearVelocity_index, world_gravity_index) = I3dt;
 
   Fx.block<3, 3>(world_linearVelocity_index, body_linearAcceleration_index) =

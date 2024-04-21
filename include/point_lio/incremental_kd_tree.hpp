@@ -8,12 +8,13 @@
 #include <limits>
 #include <memory>
 #include <queue>
+#include <mutex>
 #include <vector>
 
 namespace point_lio {
 const int k = 3;
 const float alpha = 0.5f;
-
+std::mutex treeMutex;
 struct Node {
   using Ptr = Node *;
   Eigen::Vector3d point;
@@ -67,6 +68,8 @@ public:
   bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
 
   bool search(Node::Ptr root, Eigen::Vector3d point);
+
+  std::vector<Eigen::Vector3d> flatten(Node *root);
 
   void findNearestNeighbors(
       Node::Ptr root, const Eigen::Vector3d &target,
