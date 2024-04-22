@@ -58,6 +58,22 @@ int main(int argc, char *argv[]) noexcept {
         pcl_types::LidarScanStamped scan;
         if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
           pointLIO.registerScan(scan);
+
+          {
+            nav_msgs::Odometry odomMsg;
+            odomMsg.header.frame_id = "world";
+            odomMsg.header.stamp = imuMsg->header.stamp;
+            odomMsg.pose.pose.position.x = pointLIO.world_position.x();
+            odomMsg.pose.pose.position.y = pointLIO.world_position.y();
+            odomMsg.pose.pose.position.z = pointLIO.world_position.z();
+            const auto tmp = pointLIO.world_R_body.toQuaternion();
+            odomMsg.pose.pose.orientation.w = tmp.w();
+            odomMsg.pose.pose.orientation.x = tmp.x();
+            odomMsg.pose.pose.orientation.y = tmp.y();
+            odomMsg.pose.pose.orientation.z = tmp.z();
+
+            outputBag.write(odometryTopic, msg.getTime(), odomMsg);
+          }
         }
       }
     }

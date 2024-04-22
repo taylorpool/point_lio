@@ -32,36 +32,34 @@ struct CompareDist {
         return a.first < b.first;
     }
 };
-void lockUpdates();
-void unlockUpdates();
-Node::Ptr newNode(Eigen::Vector3d point);
-bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
-Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
-Node::Ptr insertRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
-int treeSize(Node::Ptr root);
-int treeLeft(Node::Ptr root);
-int treeRight(Node::Ptr root);
-Node::Ptr build(const std::vector<Eigen::Vector3d>& v);
-bool arePointsSame(const Eigen::Vector3d point1, const Eigen::Vector3d point2);
-std::vector<Eigen::Vector3d> flatten(Node* root);
 class KDTree {
 public:
     void incrementalUpdates(Node::Ptr& root, const std::pair<Eigen::Vector3d, bool>& operation, bool updateLogger);
-
+    // KDTree() : root(nullptr) {}
     KDTree();
     std::vector<std::pair<Eigen::Vector3d, bool>> operationLogger;
     Node::Ptr root;
+    double alpha; 
 
     Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
     void parRebuild(Node::Ptr& root);
     void reBalance(Node::Ptr root, unsigned depth);
     bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
     bool search(Node::Ptr root, Eigen::Vector3d point);
-    void findNearestNeighbors(Node::Ptr root, const Eigen::Vector3d& target,
-                              std::priority_queue<std::pair<double, Eigen::Vector3d>,
-                                                  std::vector<std::pair<double, Eigen::Vector3d>>,
-                                                  CompareDist>& pq,
-                              int depth, int k);
+    Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d& target, const Eigen::MatrixXd& points, int near);
+    void lockUpdates();
+    void unlockUpdates();
+    Node::Ptr newNode(Eigen::Vector3d point);
+    Node::Ptr insertRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
+    int treeSize(Node::Ptr root);
+    int treeLeft(Node::Ptr root);
+    int treeRight(Node::Ptr root);
+    Node::Ptr build2(const auto &point);
+    bool arePointsSame(const Eigen::Vector3d point1, const Eigen::Vector3d point2);
+    std::vector<Eigen::Vector3d> flatten(Node* root);
+    Node::Ptr insert(Node::Ptr root, const Eigen::Vector3d& point, unsigned depth);
+    Node::Ptr build(const std::vector<Eigen::Vector3d>& v);
+    
 };
 
 } 

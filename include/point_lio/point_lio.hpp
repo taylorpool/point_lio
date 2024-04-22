@@ -45,6 +45,8 @@ public:
   
   point_lio::KDTree KDT;  
 
+  std::mt19937 gen;
+
   Stamp stamp;
   gtsam::Rot3 world_R_body;
   Eigen::Vector3d world_position;
@@ -88,13 +90,15 @@ public:
 
   void registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
 
-  void registerPoint(const pcl_types::PointXYZICT &point) noexcept;
+  void registerPoint(const pcl_types::PointXYZICT &point, Eigen::Vector<double, 3> plane_normal,Eigen::Vector<double, 3> point_in_plane) noexcept;
 
   void propagateForwardInPlace(const double stamp) noexcept;
 
   // Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs);
 
   Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd& points);
+
+  double sampleFromGaussian(double mean, double stddev);
 };
 
 } // namespace point_lio

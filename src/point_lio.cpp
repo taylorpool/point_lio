@@ -33,7 +33,7 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
       world_linearVelocity{Eigen::Vector3d::Zero()},
       world_gravity{0.0, 0.0, -9.81},
       body_angularVelocity{Eigen::Vector3d::Zero()},
-      body_linearAcceleration{Eigen::Vector3d::Zero()} {
+      body_linearAcceleration{Eigen::Vector3d::Zero()}{
 
   // TODO: Take these parameters from OG PointLIO
   R_imu = Eigen::Matrix<double, 6, 6>::Zero();
@@ -75,6 +75,11 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
   Fw(21, 9) = 1.0;
   Fw(22, 10) = 1.0;
   Fw(23, 11) = 1.0;
+
+  covariance = Eigen::Matrix<double, 24, 24>::Identity();
+
+  gen.seed(0);
+
 }
 
 void PointLIO::registerImu(const Imu &imu) noexcept {
@@ -174,18 +179,30 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
 
 void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
   for (const auto &point : scan.cloud) {
-    registerPoint(point);
+
+    double nlx = sampleFromGaussian(0, R_lidar(0,0));
+    double nly = sampleFromGaussian(0, R_lidar(1,1));
+    double nlz = sampleFromGaussian(0, R_lidar(2,2));
+    
+    Eigen::MatrixXd nearest_points = KDT.findNearestNeighbors(point);
+    Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
+    Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1,3>(0,0); // Taking the first point from the 5 nearest points  Eigen::Vector<double, 1> residual;
+    Eigen::Vector<double, 1> hl;
+    hl = -plane_normal.transpose()*(world_R_body.matrix()*(Eigen::Vector3d(point.x, point.y, point.z) - Eigen::Vector3d(nlx, nly, nlz)) + world_position - point_in_plane);
+
+    if (hl(0) <= 1e-6){
+      registerPoint(point, plane_normal, point_in_plane);
+    }
+    else{
+     KDT.build2(point);
+     
+    }
   }
 }
 
-void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
+void PointLIO::registerPoint(const pcl_types::PointXYZICT &point, Eigen::Vector<double, 3> plane_normal,Eigen::Vector<double, 3> point_in_plane) noexcept {
   
   propagateForwardInPlace(1); //TODO: point.stamp
-
-  // TODO: Plane Correspondence
-  Eigen::MatrixXd nearest_points = KDT.findNearestNeighbors(point);
-  Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
-  Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1,3>(0,0); // Taking the first point from the 5 nearest points
 
   Eigen::Matrix<double, 1, 24> H;
   H.block<1, 18>(0, 6).array() = 0.0;
@@ -284,5 +301,13 @@ Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd& points) {
 
     return normal;
 }
+
+  double PointLIO::sampleFromGaussian(double mean, double stddev) {
+  // Function to sample a point from a Gaussian distribution
+
+      std::normal_distribution<double> dist(mean, stddev);
+
+      return dist(gen);
+  }
 
 } // namespace point_lio

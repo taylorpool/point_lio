@@ -5,7 +5,7 @@ namespace point_lio {
 Node::Node(Eigen::Vector3d point)
     : point(point), left(nullptr), right(nullptr) {}
 
-Node::Ptr newNode(Eigen::Vector3d point) {
+Node::Ptr KDTree::newNode(Eigen::Vector3d point) {
   Node::Ptr temp = new Node(point);
   temp->point = point;
   temp->left = NULL;
@@ -14,32 +14,31 @@ Node::Ptr newNode(Eigen::Vector3d point) {
   return temp;
 }
 
-int treeSize(Node::Ptr root) {
+int KDTree::treeSize(Node::Ptr root) {
   if (root == nullptr) {
     return 0;
   }
   return 1 + treeSize(root->left) + treeSize(root->right);
 }
 
-int treeLeft(Node::Ptr root) {
+int KDTree::treeLeft(Node::Ptr root) {
   if (root == nullptr) {
     return 0;
   }
   return treeSize(root->left);
 }
 
-int treeRight(Node::Ptr root) {
+int KDTree::treeRight(Node::Ptr root) {
   if (root == nullptr) {
     return 0;
   }
   return treeSize(root->right);
 }
 
-Node::Ptr insert(Node::Ptr root, const Eigen::Vector3d& point, unsigned depth = 0) {
+Node::Ptr KDTree::insert(Node::Ptr root, const Eigen::Vector3d& point, unsigned depth = 0) {
     if (root == nullptr) {
         return newNode(point);
     }
-
     unsigned cd = depth % k;
     if (point[cd] < root->point[cd]) {
         root->left = insert(root->left, point, depth + 1);
@@ -49,15 +48,24 @@ Node::Ptr insert(Node::Ptr root, const Eigen::Vector3d& point, unsigned depth = 
     return root;
 }
 
-Node::Ptr build(const std::vector<Eigen::Vector3d>& v, KDTree& kdtree) {
+Node::Ptr KDTree::build2(const auto &point) {
+    Node::Ptr root = nullptr;
+
+    std::pair<Eigen::Vector3d, bool> operation(point, true);
+    incrementalUpdates(root, operation, false); 
+    return root;
+}
+
+Node::Ptr KDTree::build(const std::vector<Eigen::Vector3d>& v) {
     Node::Ptr root = nullptr;
 
     for (const auto& point : v) {
         std::pair<Eigen::Vector3d, bool> operation(point, true);
-        kdtree.incrementalUpdates(root, operation, false); 
+        incrementalUpdates(root, operation, false); 
     }
     return root;
 }
+
 void KDTree::incrementalUpdates(Node::Ptr& root, const std::pair<Eigen::Vector3d, bool>& operation, bool updateLogger) {
     const Eigen::Vector3d& point = operation.first;
     bool isInsertOperation = operation.second;
@@ -70,23 +78,23 @@ void KDTree::incrementalUpdates(Node::Ptr& root, const std::pair<Eigen::Vector3d
     }
 }
 
-void lockUpdates() { treeMutex.lock(); }
-void unlockUpdates() { treeMutex.unlock(); }
+void KDTree::lockUpdates() { treeMutex.lock(); }
+void KDTree::unlockUpdates() { treeMutex.unlock(); }
 
-void parRebuild(Node::Ptr root) {
+void KDTree::parRebuild(Node::Ptr& root) {
     lockUpdates();
     std::vector<Eigen::Vector3d> v = flatten(root);
     unlockUpdates();
 
-    KDTree kdtree;
-    Node::Ptr newRoot = build(v, kdtree);
+    // KDTree kdtree;
+    Node::Ptr newRoot = build(v);
 
     lockUpdates();
     root = newRoot;
     unlockUpdates();
 }
 
-void reBalance(Node::Ptr root, unsigned depth) {
+void KDTree::reBalance(Node::Ptr root, unsigned depth) {
     int tree_size = treeSize(root);
     int tree_left = treeLeft(root);
     int tree_right = treeRight(root);
@@ -97,7 +105,7 @@ void reBalance(Node::Ptr root, unsigned depth) {
     }
 }
 
-Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
+Node::Ptr KDTree::removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
   if (root == nullptr)
     return nullptr;
 
@@ -135,7 +143,7 @@ Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
 }
 
 
-std::vector<Eigen::Vector3d> flatten(Node *root) {
+std::vector<Eigen::Vector3d> KDTree::flatten(Node *root) {
   std::vector<Eigen::Vector3d> points;
   std::function<void(Node *)> traverse = [&](Node *node) {
     if (node == nullptr) {
@@ -149,7 +157,7 @@ std::vector<Eigen::Vector3d> flatten(Node *root) {
   return points;
 }
 
-bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
+bool KDTree::searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
   if (root == NULL)
     return false;
   if (arePointsSame(root->point, point))
@@ -163,34 +171,66 @@ bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
   return searchRec(root->right, point, depth + 1);
 }
 
-bool search(Node::Ptr root, Eigen::Vector3d point) {
+bool KDTree::search(Node::Ptr root, Eigen::Vector3d point) {
   return searchRec(root, point, 0);
 }
 
-void findNearestNeighbors(
-    Node::Ptr root, const Eigen::Vector3d &target,
-    std::priority_queue<std::pair<double, Eigen::Vector3d>,
-                        std::vector<std::pair<double, Eigen::Vector3d>>,
-                        CompareDist> &pq,
-    int depth = 0, int k = 5) {
-  if (root == nullptr)
-    return;
+Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d& target) {
+    int numNearest = 5;
+    std::lock_guard<std::mutex> guard(treeMutex);
+    std::priority_queue<std::pair<double, Eigen::Vector3d>, std::vector<std::pair<double, Eigen::Vector3d>>, CompareDist> pq;
 
-  unsigned int cd = depth % k;
-  double dist = (root->point - target).norm();
-  if (pq.size() < k) {
-    pq.push(std::make_pair(dist, root->point));
-  } else if (dist < pq.top().first) {
-    pq.pop();
-    pq.push(std::make_pair(dist, root->point));
-  }
-  Node::Ptr nearer = (target[cd] < root->point[cd]) ? root->left : root->right;
-  Node::Ptr farther = (target[cd] < root->point[cd]) ? root->right : root->left;
+    std::function<void(Node::Ptr, unsigned)> traverse = [&](Node::Ptr node, unsigned depth) {
+        if (!node) return;
 
-  findNearestNeighbors(nearer, target, pq, depth + 1, k);
-  if (farther != nullptr &&
-      (fabs(target[cd] - root->point[cd]) < pq.top().first)) {
-    findNearestNeighbors(farther, target, pq, depth + 1, k);
-  }
+        unsigned cd = depth % k;
+        double dist = (node->point - target).norm();
+        if (pq.size() < numNearest) {
+            pq.push({dist, node->point});
+        } else if (dist < pq.top().first) {
+            pq.pop();
+            pq.push({dist, node->point});
+        }
+        double diff = target[cd] - node->point[cd];
+        Node::Ptr first = (diff < 0) ? node->left : node->right;
+        Node::Ptr second = (diff < 0) ? node->right : node->left;
+
+        traverse(first, depth + 1);
+        if (fabs(diff) < pq.top().first) {
+            traverse(second, depth + 1);
+        }
+    };
+
+    traverse(root, 0);
+
+    Eigen::MatrixXd neighbors(pq.size(), 3);
+    int i = pq.size() - 1;
+    while (!pq.empty()) {
+        neighbors.row(i--) = pq.top().second;
+        pq.pop();
+    }
+    return neighbors;
 }
+
+// Eigen::MatrixXd KDTree::findNearestNeighbors(const Eigen::Vector3d& target, const Eigen::MatrixXd& points, int near = 5) {
+//    std::priority_queue<std::pair<double, Eigen::Vector3d>, std::vector<std::pair<double, Eigen::Vector3d>>, CompareDist> pq;
+//    for (int i = 0; i < points.rows(); ++i) {
+//        const Eigen::Vector3d& point = points.row(i);
+//        double dist = (point - target).norm();
+//        if (pq.size() < near) {
+//            pq.push(std::make_pair(dist, point));
+//        } else if (dist < pq.top().first) {
+//            pq.pop();
+//            pq.push(std::make_pair(dist, point));
+//        }
+//    }
+
+//    Eigen::MatrixXd neighbors(near, 3);
+//    for (int i = 0; i < near; ++i) {
+//        neighbors.row(i) = pq.top().second;
+//        pq.pop();
+//    }
+
+//    return neighbors;
+// }
 }
