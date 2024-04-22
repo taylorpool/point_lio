@@ -60,8 +60,6 @@ public:
   Eigen::Vector3d body_angularVelocity;
   Eigen::Vector3d body_linearAcceleration;
 
-  gtsam::Rot3 world_R_body_hat;
-
   Eigen::Matrix<double, 6, 6> R_imu;
 
   Eigen::Matrix<double, 3, 3> R_lidar;
@@ -91,11 +89,7 @@ public:
 
   void registerImu(const Imu &imu) noexcept;
 
-  void registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
-
-  void registerPoint(const pcl_types::PointXYZICT &point,
-                     Eigen::Vector<double, 3> plane_normal,
-                     Eigen::Vector<double, 3> point_in_plane) noexcept;
+  void registerPoint(const pcl_types::PointXYZICT &point) noexcept;
 
   void propagateForwardInPlace(const double stamp) noexcept;
 

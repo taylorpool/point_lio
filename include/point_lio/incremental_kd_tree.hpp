@@ -54,7 +54,8 @@ public:
   bool search(Node::Ptr root, Eigen::Vector3d point);
   // Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d& target, const
   // Eigen::MatrixXd& points, int near);
-  Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d &target);
+  Eigen::Matrix<double, 5, 3>
+  findNearestNeighbors(const Eigen::Vector3d &target);
   void lockUpdates();
   void unlockUpdates();
   Node::Ptr newNode(Eigen::Vector3d point);

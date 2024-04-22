@@ -156,8 +156,6 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     const Eigen::Vector<double, 24> delta_state =
         covariance_H_t * SLLT.solve(residual);
 
-    world_R_body_hat = world_R_body;
-
     // Covariance and state update
     covariance -= covariance_H_t * SLLT.solve(H) * covariance;
 
@@ -171,8 +169,7 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     body_linearAcceleration += delta_state.segment<3>(21);
 
     // Estimate theta
-    Eigen::Vector3d theta =
-        gtsam::Rot3::Logmap(world_R_body * world_R_body_hat);
+    const Eigen::Vector3d theta = delta_state.segment<3>(0);
     double norm_theta_div_2 = theta.norm() / 2.0;
     Eigen::Matrix<double, 24, 24> Jt;
     Jt.block<3, 3>(0, 0) =
@@ -188,41 +185,27 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
   }
 }
 
-void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
-  std::cout << "register scan\n";
-  for (const auto &point : scan.cloud) {
+void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
 
-    double nlx = sampleFromGaussian(0, R_lidar(0, 0));
-    double nly = sampleFromGaussian(0, R_lidar(1, 1));
-    double nlz = sampleFromGaussian(0, R_lidar(2, 2));
+  propagateForwardInPlace(point.timeOffset - stamp);
 
-    Eigen::MatrixXd nearest_points =
-        KDT.findNearestNeighbors(Eigen::Vector3d(point.x, point.y, point.z));
-    Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
-    Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1, 3>(
-        0, 0); // Taking the first point from the 5 nearest points
-               // Eigen::Vector<double, 1> residual;
-    Eigen::Vector<double, 1> hl;
-    hl = -plane_normal.transpose() *
-         (world_R_body.matrix() * (Eigen::Vector3d(point.x, point.y, point.z) -
-                                   Eigen::Vector3d(nlx, nly, nlz)) +
-          world_position - point_in_plane);
+  const Eigen::Vector3d world_point =
+      world_R_body * point.getVec3Map().cast<double>() + world_position;
 
-    pcl_types::PointXYZICT newPoint = point;
-    newPoint.timeOffset = scan.stamp + point.timeOffset;
-    if (hl(0) <= 1e-6) {
-      registerPoint(newPoint, plane_normal, point_in_plane);
-    } else {
-      KDT.build2(newPoint.getVec3Map().cast<double>());
-    }
+  const Eigen::Matrix<double, 5, 3> nearest_points =
+      KDT.findNearestNeighbors(world_point);
+
+  const Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
+  const Eigen::Vector<double, 3> point_in_plane =
+      nearest_points.row(0).transpose();
+
+  Eigen::Vector<double, 1> hl;
+  hl = -plane_normal.transpose() *
+       (world_R_body * (world_point - Eigen::Vector3d(nlx, nly, nlz)) +
+        world_position - point_in_plane);
+  if (hl(0) > 1e-6) {
+    KDT.build2(point.getVec3Map().cast<double>());
   }
-}
-
-void PointLIO::registerPoint(const pcl_types::PointXYZICT &point,
-                             Eigen::Vector<double, 3> plane_normal,
-                             Eigen::Vector<double, 3> point_in_plane) noexcept {
-
-  propagateForwardInPlace(point.timeOffset - stamp); // TODO: point.stamp
 
   Eigen::Matrix<double, 1, 24> H;
   H.block<1, 18>(0, 6).array() = 0.0;
@@ -250,8 +233,6 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point,
   const Eigen::Vector<double, 24> delta_state =
       covariance_H_t * SLLT.solve(residual);
 
-  world_R_body_hat = world_R_body;
-
   // Covariance and state update
   covariance -= covariance_H_t * SLLT.solve(H) * covariance;
 
@@ -264,7 +245,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point,
   body_linearAcceleration += delta_state.segment<3>(21);
 
   // Estimate theta
-  Eigen::Vector3d theta = gtsam::Rot3::Logmap(world_R_body * world_R_body_hat);
+  const Eigen::Vector3d theta = delta_state.segment<3>(0);
   double norm_theta_div_2 = theta.norm() / 2.0;
   Eigen::Matrix<double, 24, 24> Jt;
   Jt.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() -

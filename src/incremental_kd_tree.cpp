@@ -182,7 +182,8 @@ bool arePointsSame(const Eigen::Vector3d point1, const Eigen::Vector3d point2) {
 
 KDTree::KDTree() : root(nullptr) {}
 
-Eigen::MatrixXd KDTree::findNearestNeighbors(const Eigen::Vector3d &target) {
+Eigen::Matrix<double, 5, 3>
+KDTree::findNearestNeighbors(const Eigen::Vector3d &target) {
   int numNearest = 5;
   std::lock_guard<std::mutex> guard(treeMutex);
   std::priority_queue<std::pair<double, Eigen::Vector3d>,
@@ -215,7 +216,7 @@ Eigen::MatrixXd KDTree::findNearestNeighbors(const Eigen::Vector3d &target) {
 
   traverse(root, 0);
 
-  Eigen::MatrixXd neighbors(pq.size(), 3);
+  Eigen::Matrix<double, 5, 3> neighbors;
   int i = pq.size() - 1;
   while (!pq.empty()) {
     neighbors.row(i--) = pq.top().second;

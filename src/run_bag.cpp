@@ -1,6 +1,8 @@
 #include "pcl_types/pcl_types_ros1.hpp"
 #include "point_lio_ros1/point_lio_ros1.hpp"
 
+#include <geometry_msgs/Vector3Stamped.h>
+
 #include "point_lio/point_lio.hpp"
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
@@ -36,8 +38,6 @@ int main(int argc, char *argv[]) noexcept {
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
           pointLIO.registerImu(imu);
 
-          std::cout << pointLIO.world_position.transpose() << " "
-                    << pointLIO.world_R_body << "\n";
           {
             nav_msgs::Odometry odomMsg;
             odomMsg.header.frame_id = "world";
@@ -55,28 +55,30 @@ int main(int argc, char *argv[]) noexcept {
           }
         }
       }
-    } else if (dataType == "sensor_msgs/PointCloud") {
-      const auto scanMsg = msg.instantiate<sensor_msgs::PointCloud2>();
-      if (scanMsg != nullptr) {
-        pcl_types::LidarScanStamped scan;
-        if (pcl_types::ros1::fromMsg(*scanMsg, scan)) {
-          pointLIO.registerScan(scan);
+    } else if (dataType == "geometry_msgs/Vector3Stamped") {
+      const auto pointMsg = msg.instantiate<geometry_msgs::Vector3Stamped>();
+      if (pointMsg != nullptr) {
+        pcl_types::PointXYZICT point;
+        point.timeOffset = pointMsg->header.stamp.toSec();
+        point.x = static_cast<float>(pointMsg->vector.x);
+        point.y = static_cast<float>(pointMsg->vector.y);
+        point.z = static_cast<float>(pointMsg->vector.z);
+        pointLIO.registerPoint(point);
 
-          {
-            nav_msgs::Odometry odomMsg;
-            odomMsg.header.frame_id = "world";
-            odomMsg.header.stamp = scanMsg->header.stamp;
-            odomMsg.pose.pose.position.x = pointLIO.world_position.x();
-            odomMsg.pose.pose.position.y = pointLIO.world_position.y();
-            odomMsg.pose.pose.position.z = pointLIO.world_position.z();
-            const auto tmp = pointLIO.world_R_body.toQuaternion();
-            odomMsg.pose.pose.orientation.w = tmp.w();
-            odomMsg.pose.pose.orientation.x = tmp.x();
-            odomMsg.pose.pose.orientation.y = tmp.y();
-            odomMsg.pose.pose.orientation.z = tmp.z();
+        {
+          nav_msgs::Odometry odomMsg;
+          odomMsg.header.frame_id = "world";
+          odomMsg.header.stamp = pointMsg->header.stamp;
+          odomMsg.pose.pose.position.x = pointLIO.world_position.x();
+          odomMsg.pose.pose.position.y = pointLIO.world_position.y();
+          odomMsg.pose.pose.position.z = pointLIO.world_position.z();
+          const auto world_R_body = pointLIO.world_R_body.toQuaternion();
+          odomMsg.pose.pose.orientation.w = world_R_body.w();
+          odomMsg.pose.pose.orientation.x = world_R_body.x();
+          odomMsg.pose.pose.orientation.y = world_R_body.y();
+          odomMsg.pose.pose.orientation.z = world_R_body.z();
 
-            outputBag.write(odometryTopic, msg.getTime(), odomMsg);
-          }
+          outputBag.write(odometryTopic, msg.getTime(), odomMsg);
         }
       }
     }
