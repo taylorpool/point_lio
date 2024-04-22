@@ -214,6 +214,14 @@ target_link_libraries(run_bag
     PointLIOROS1
 )
 
+add_executable(to_point_bag
+    src/to_point_bag.cpp
+    src/utils_ros1.cpp
+)
+target_link_libraries(to_point_bag
+    PointLIOROS1
+)
+
 install(
     TARGETS
         PCLTypes

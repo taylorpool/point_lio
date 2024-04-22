@@ -9,7 +9,6 @@
 #include <ros/ros.h>
 
 #include <cstdint>
-#include <format>
 #include <string>
 
 namespace utils::ros1 {
@@ -31,8 +30,7 @@ template <RosParamT T>
 [[nodiscard]] bool getParam(ros::NodeHandle &node, const std::string &paramName,
                             T &param) noexcept {
   if (!node.getParam(paramName, param)) {
-    std::cerr << std::format("Error: Could not find {}/{}\n",
-                             node.getNamespace(), paramName);
+    std::cerr << "Error: Could not find param\n";
     return false;
   } else {
     return true;
