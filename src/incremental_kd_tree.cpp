@@ -32,35 +32,69 @@ int treeRight(Node::Ptr root) {
   if (root == nullptr) {
     return 0;
   }
-void lockUpdates(float root) { treeMutex.lock(); }
-void unlockUpdates() { treeMutex.unlock(); }
+  return treeSize(root->right);
 }
 
-Node::Ptr build(const std::vector<Eigen::Vector3d>& v) {
-    Node::Ptr root = nullptr;
-    for (auto& point : v) {
-        root = insert(root, point);
+Node::Ptr insert(Node::Ptr root, const Eigen::Vector3d& point, unsigned depth = 0) {
+    if (root == nullptr) {
+        return newNode(point);
+    }
+
+    unsigned cd = depth % k;
+    if (point[cd] < root->point[cd]) {
+        root->left = insert(root->left, point, depth + 1);
+    } else {
+        root->right = insert(root->right, point, depth + 1);
     }
     return root;
-} 
-void lockUpdates( { treeMutex.lock(); }
+}
+
+Node::Ptr build(const std::vector<Eigen::Vector3d>& v, KDTree& kdtree) {
+    Node::Ptr root = nullptr;
+
+    for (const auto& point : v) {
+        std::pair<Eigen::Vector3d, bool> operation(point, true);
+        kdtree.incrementalUpdates(root, operation, false); 
+    }
+    return root;
+}
+void KDTree::incrementalUpdates(Node::Ptr& root, const std::pair<Eigen::Vector3d, bool>& operation, bool updateLogger) {
+    const Eigen::Vector3d& point = operation.first;
+    bool isInsertOperation = operation.second;
+    if (isInsertOperation) {
+        root = insert(root, point);
+    } else {
+        if (search(root, point)) {
+            root = removeNode(root, point, 0);
+        }
+    }
+}
+
+void lockUpdates() { treeMutex.lock(); }
 void unlockUpdates() { treeMutex.unlock(); }
 
-void KDTree::incrementalUpdates(
-    Node::Ptr root, const std::pair<Eigen::Vector3d, bool> &operation,
-    bool updateLogger) {
-  Eigen::Vector3d point = operation.first;
-  bool insertOperation = operation.second;
+void parRebuild(Node::Ptr root) {
+    lockUpdates();
+    std::vector<Eigen::Vector3d> v = flatten(root);
+    unlockUpdates();
 
-  if (insertOperation) {
-    root = insert(root, point);
-  } else {
-    if (searchRec(root, point, 0))
-void lockUpdates(float root) { treeMutex.lock(); }
-void unlockUpdates() { treeMutex.unlock(); }
-  if (updateLogger) {
-    operationLogger.push_back(operation);
-  }
+    KDTree kdtree;
+    Node::Ptr newRoot = build(v, kdtree);
+
+    lockUpdates();
+    root = newRoot;
+    unlockUpdates();
+}
+
+void reBalance(Node::Ptr root, unsigned depth) {
+    int tree_size = treeSize(root);
+    int tree_left = treeLeft(root);
+    int tree_right = treeRight(root);
+
+    if (tree_left < alpha * tree_size && tree_right < alpha * tree_size) {
+    } else {
+    
+    }
 }
 
 Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
@@ -69,8 +103,8 @@ Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
 
   unsigned cd = depth % k;
 
-void lockUpdates(float root) { treeMutex.lock(); }
-void unlockUpdates() { treeMutex.unlock(); }root->right == nullptr) {
+  if (arePointsSame(root->point, point)) {
+    if (root->left == nullptr && root->right == nullptr) {
       delete root;
       return nullptr;
     }
@@ -84,6 +118,8 @@ void unlockUpdates() { treeMutex.unlock(); }root->right == nullptr) {
       delete root;
       return temp;
     }
+
+
     Node::Ptr temp = root->right;
     while (temp->left != nullptr)
       temp = temp->left;
@@ -98,6 +134,7 @@ void unlockUpdates() { treeMutex.unlock(); }root->right == nullptr) {
   return root;
 }
 
+
 std::vector<Eigen::Vector3d> flatten(Node *root) {
   std::vector<Eigen::Vector3d> points;
   std::function<void(Node *)> traverse = [&](Node *node) {
@@ -110,39 +147,6 @@ std::vector<Eigen::Vector3d> flatten(Node *root) {
   };
   traverse(root);
   return points;
-}
-
-
-void lockUpdates(float root) { treeMutex.lock(); }
-void unlockUpdates() { treeMutex.unlock(); }
-
-void parRebuild(Node::Ptr root) {
-  lockUpdates(root);
-  std::vector<Eigen::Vector3d> v = flatten(root);
-  unlock(root);
-  Node::Ptr newRoot = build(v);
-  for (const auto &op : operationLogger) {
-    incrementalUpdates(newRoot, op, false);
-  }
-  Node::Ptr temp = root;
-  lockUpdates(root);
-  root = newRoot;
-  unlock(root);
-}
-
-void reBalance(Node::Ptr root, unsigned depth) {
-  int tree_size = treeSize(root);
-  int tree_left = treeLeft(root);
-  int tree_right = treeRight(root);
-
-  if (tree_left < alpha * tree_size && tree_right < alpha * tree_size) {
-  } else {
-    parRebuild(root);
-  }
-}
-
-bool arePointsSame(const Eigen::Vector3d point1, const Eigen::Vector3d point2) {
-  return (point1 - point2).squaredNorm() < 1e-3;
 }
 
 bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth) {
@@ -189,5 +193,4 @@ void findNearestNeighbors(
     findNearestNeighbors(farther, target, pq, depth + 1, k);
   }
 }
-
-} // namespace point_lio
+}
