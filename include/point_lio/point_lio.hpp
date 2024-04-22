@@ -36,6 +36,8 @@ struct PointLIOParams {
   size_t imuInitializationQuota;
 };
 
+double square(const double x);
+
 Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points);
 
 class PointLIO {

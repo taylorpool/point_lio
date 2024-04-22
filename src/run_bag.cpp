@@ -8,6 +8,7 @@
 #include <rosbag/view.h>
 
 #include <span>
+#include <thread>
 
 int main(int argc, char *argv[]) noexcept {
   const std::span args(argv, argc);
@@ -35,6 +36,8 @@ int main(int argc, char *argv[]) noexcept {
         if (point_lio::ros1::fromMsg(*imuMsg, imu)) {
           pointLIO.registerImu(imu);
 
+          std::cout << pointLIO.world_position.transpose() << " "
+                    << pointLIO.world_R_body << "\n";
           {
             nav_msgs::Odometry odomMsg;
             odomMsg.header.frame_id = "world";
@@ -42,11 +45,11 @@ int main(int argc, char *argv[]) noexcept {
             odomMsg.pose.pose.position.x = pointLIO.world_position.x();
             odomMsg.pose.pose.position.y = pointLIO.world_position.y();
             odomMsg.pose.pose.position.z = pointLIO.world_position.z();
-            const auto tmp = pointLIO.world_R_body.toQuaternion();
-            odomMsg.pose.pose.orientation.w = tmp.w();
-            odomMsg.pose.pose.orientation.x = tmp.x();
-            odomMsg.pose.pose.orientation.y = tmp.y();
-            odomMsg.pose.pose.orientation.z = tmp.z();
+            const auto world_R_body = pointLIO.world_R_body.toQuaternion();
+            odomMsg.pose.pose.orientation.w = world_R_body.w();
+            odomMsg.pose.pose.orientation.x = world_R_body.x();
+            odomMsg.pose.pose.orientation.y = world_R_body.y();
+            odomMsg.pose.pose.orientation.z = world_R_body.z();
 
             outputBag.write(odometryTopic, msg.getTime(), odomMsg);
           }

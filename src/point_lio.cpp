@@ -5,19 +5,26 @@
 
 namespace point_lio {
 
+double square(const double x) { return x * x; }
+
 [[nodiscard]] gtsam::Rot3
 compute_plane_R_vec(const Eigen::Vector3d planeNormal,
                     const Eigen::Vector3d vec) noexcept {
+  const double x_norm = vec.norm();
+
+  const auto n_dot_vec = planeNormal.dot(vec);
   const Eigen::Vector3d y =
-      (vec - vec.dot(planeNormal) * planeNormal).normalized();
+      (vec - n_dot_vec * planeNormal).normalized() * x_norm;
 
-  const Eigen::Vector3d x = vec.normalized();
+  const double cos_theta = vec.dot(y) / square(x_norm);
 
-  const double cos_theta = x.dot(y);
-  const Eigen::Vector3d u_sin_theta = x.cross(y);
+  const double sin_theta = std::sqrt(1.0d - square(cos_theta)) *
+                           (2 * static_cast<double>(n_dot_vec > 0) - 1.0d);
 
-  return gtsam::Rot3::Quaternion(cos_theta, u_sin_theta.x(), u_sin_theta.y(),
-                                 u_sin_theta.z());
+  const Eigen::Vector3d axis = planeNormal.cross(vec).normalized();
+
+  return gtsam::Rot3::Quaternion(cos_theta, sin_theta * axis.x(),
+                                 sin_theta * axis.y(), sin_theta * axis.z());
 }
 
 [[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) {
@@ -92,16 +99,18 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     if (m_imuBuffer.size() >= m_params.imuInitializationQuota) {
       Eigen::Vector3d body_meanMeasuredLinearAcceleration =
           Eigen::Vector3d::Zero();
-      std::transform_reduce(
+
+      body_meanMeasuredLinearAcceleration = std::transform_reduce(
           std::execution::par_unseq, m_imuBuffer.cbegin(), m_imuBuffer.cend(),
           body_meanMeasuredLinearAcceleration, std::plus<Eigen::Vector3d>(),
-          [this](const auto imu) {
+          [this](const auto &imu) {
             return imu.body_measuredLinearAcceleration / m_imuBuffer.size();
           });
 
       Eigen::Vector3d body_meanMeasuredAngularVelocity =
           Eigen::Vector3d::Zero();
-      std::transform_reduce(
+
+      body_meanMeasuredAngularVelocity = std::transform_reduce(
           std::execution::par_unseq, m_imuBuffer.cbegin(), m_imuBuffer.cend(),
           body_meanMeasuredAngularVelocity, std::plus<Eigen::Vector3d>(),
           [this](const auto &imu) {
@@ -120,7 +129,7 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
       m_imuBuffer.clear();
     }
   } else if (imu.stamp > stamp) {
-    propagateForwardInPlace(imu.stamp);
+    propagateForwardInPlace(imu.stamp - stamp);
 
     Eigen::Matrix<double, 6, 24> H;
     H.block<6, 9>(0, 0).array() = 0.0;
@@ -175,10 +184,12 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     Jt.block<21, 3>(3, 0).array() = 0.0;
     Jt.block<21, 21>(3, 3) = Eigen::Matrix<double, 21, 21>::Identity();
     covariance = Jt.transpose() * covariance * Jt;
+    stamp = imu.stamp;
   }
 }
 
 void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
+  std::cout << "register scan\n";
   for (const auto &point : scan.cloud) {
 
     double nlx = sampleFromGaussian(0, R_lidar(0, 0));
@@ -197,10 +208,12 @@ void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
                                    Eigen::Vector3d(nlx, nly, nlz)) +
           world_position - point_in_plane);
 
+    pcl_types::PointXYZICT newPoint = point;
+    newPoint.timeOffset = scan.stamp + point.timeOffset;
     if (hl(0) <= 1e-6) {
-      registerPoint(point, plane_normal, point_in_plane);
+      registerPoint(newPoint, plane_normal, point_in_plane);
     } else {
-      KDT.build2(point.getVec3Map().cast<double>());
+      KDT.build2(newPoint.getVec3Map().cast<double>());
     }
   }
 }
@@ -209,7 +222,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point,
                              Eigen::Vector<double, 3> plane_normal,
                              Eigen::Vector<double, 3> point_in_plane) noexcept {
 
-  propagateForwardInPlace(1); // TODO: point.stamp
+  propagateForwardInPlace(point.timeOffset - stamp); // TODO: point.stamp
 
   Eigen::Matrix<double, 1, 24> H;
   H.block<1, 18>(0, 6).array() = 0.0;
@@ -263,11 +276,10 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point,
   Jt.block<21, 3>(3, 0).array() = 0.0;
   Jt.block<21, 21>(3, 3) = Eigen::Matrix<double, 21, 21>::Identity();
   covariance = Jt.transpose() * covariance * Jt;
+  stamp = point.timeOffset;
 }
 
-void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
-  const double dt = stamp - _stamp;
-
+void PointLIO::propagateForwardInPlace(const double dt) noexcept {
   const auto I3 = Eigen::Matrix3d::Identity();
   const auto I3dt = I3 * dt;
 
