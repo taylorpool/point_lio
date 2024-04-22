@@ -33,7 +33,7 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
       world_linearVelocity{Eigen::Vector3d::Zero()},
       world_gravity{0.0, 0.0, -9.81},
       body_angularVelocity{Eigen::Vector3d::Zero()},
-      body_linearAcceleration{Eigen::Vector3d::Zero()}{
+      body_linearAcceleration{Eigen::Vector3d::Zero()} {
 
   // TODO: Take these parameters from OG PointLIO
   R_imu = Eigen::Matrix<double, 6, 6>::Zero();
@@ -79,7 +79,6 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
   covariance = Eigen::Matrix<double, 24, 24>::Identity();
 
   gen.seed(0);
-
 }
 
 void PointLIO::registerImu(const Imu &imu) noexcept {
@@ -109,7 +108,7 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
             return imu.body_measuredAngularVelocity / m_imuBuffer.size();
           });
 
-      const gtsam::Rot3 roll_R_body = compute_plane_R_vec(        // Zero yaw
+      const gtsam::Rot3 roll_R_body = compute_plane_R_vec( // Zero yaw
           {0.0, 1.0, 0.0}, body_meanMeasuredLinearAcceleration);
       const gtsam::Rot3 world_R_roll = compute_plane_R_vec(
           {1.0, 0.0, 0.0}, roll_R_body * body_meanMeasuredLinearAcceleration);
@@ -152,8 +151,9 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
 
     // Covariance and state update
     covariance -= covariance_H_t * SLLT.solve(H) * covariance;
-    
-    world_R_body = world_R_body * gtsam::Rot3::Expmap(delta_state.segment<3>(0));
+
+    world_R_body =
+        world_R_body * gtsam::Rot3::Expmap(delta_state.segment<3>(0));
     world_position += delta_state.segment<3>(3);
     world_linearVelocity += delta_state.segment<3>(6);
     imuBias_gyroscope.value() += delta_state.segment<3>(9);
@@ -162,13 +162,14 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     body_linearAcceleration += delta_state.segment<3>(21);
 
     // Estimate theta
-    Eigen::Vector3d theta = gtsam::Rot3::Logmap(world_R_body*world_R_body_hat);
+    Eigen::Vector3d theta =
+        gtsam::Rot3::Logmap(world_R_body * world_R_body_hat);
     double norm_theta_div_2 = theta.norm() / 2.0;
     Eigen::Matrix<double, 24, 24> Jt;
     Jt.block<3, 3>(0, 0) =
         Eigen::Matrix3d::Identity() - skewSymmetric(theta / 2.0) +
         (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
-                    std::sin(norm_theta_div_2)) *
+                   std::sin(norm_theta_div_2)) *
             skewSymmetric(theta) / theta.norm();
     Jt.block<3, 21>(0, 3).array() = 0.0;
     Jt.block<21, 3>(3, 0).array() = 0.0;
@@ -180,40 +181,51 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
 void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
   for (const auto &point : scan.cloud) {
 
-    double nlx = sampleFromGaussian(0, R_lidar(0,0));
-    double nly = sampleFromGaussian(0, R_lidar(1,1));
-    double nlz = sampleFromGaussian(0, R_lidar(2,2));
-    
-    Eigen::MatrixXd nearest_points = KDT.findNearestNeighbors(Eigen::Vector3d(point.x, point.y, point.z));
-    Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
-    Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1,3>(0,0); // Taking the first point from the 5 nearest points  Eigen::Vector<double, 1> residual;
-    Eigen::Vector<double, 1> hl;
-    hl = -plane_normal.transpose()*(world_R_body.matrix()*(Eigen::Vector3d(point.x, point.y, point.z) - Eigen::Vector3d(nlx, nly, nlz)) + world_position - point_in_plane);
+    double nlx = sampleFromGaussian(0, R_lidar(0, 0));
+    double nly = sampleFromGaussian(0, R_lidar(1, 1));
+    double nlz = sampleFromGaussian(0, R_lidar(2, 2));
 
-    if (hl(0) <= 1e-6){
+    Eigen::MatrixXd nearest_points =
+        KDT.findNearestNeighbors(Eigen::Vector3d(point.x, point.y, point.z));
+    Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
+    Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1, 3>(
+        0, 0); // Taking the first point from the 5 nearest points
+               // Eigen::Vector<double, 1> residual;
+    Eigen::Vector<double, 1> hl;
+    hl = -plane_normal.transpose() *
+         (world_R_body.matrix() * (Eigen::Vector3d(point.x, point.y, point.z) -
+                                   Eigen::Vector3d(nlx, nly, nlz)) +
+          world_position - point_in_plane);
+
+    if (hl(0) <= 1e-6) {
       registerPoint(point, plane_normal, point_in_plane);
-    }
-    else{
-     KDT.build2(point);
-     
+    } else {
+      KDT.build2(point.getVec3Map().cast<double>());
     }
   }
 }
 
-void PointLIO::registerPoint(const pcl_types::PointXYZICT &point, Eigen::Vector<double, 3> plane_normal,Eigen::Vector<double, 3> point_in_plane) noexcept {
-  
-  propagateForwardInPlace(1); //TODO: point.stamp
+void PointLIO::registerPoint(const pcl_types::PointXYZICT &point,
+                             Eigen::Vector<double, 3> plane_normal,
+                             Eigen::Vector<double, 3> point_in_plane) noexcept {
+
+  propagateForwardInPlace(1); // TODO: point.stamp
 
   Eigen::Matrix<double, 1, 24> H;
   H.block<1, 18>(0, 6).array() = 0.0;
-  H.block<1,3>(0,0) = -plane_normal.transpose()*world_R_body.matrix()*skewSymmetric(Eigen::Vector3d(point.x, point.y, point.z));
-  H.block<1,3>(0,3) = plane_normal.transpose();
+  H.block<1, 3>(0, 0) =
+      -plane_normal.transpose() * world_R_body.matrix() *
+      skewSymmetric(Eigen::Vector3d(point.x, point.y, point.z));
+  H.block<1, 3>(0, 3) = plane_normal.transpose();
 
-  Eigen::MatrixXd D(1,3);
-  D = -plane_normal.transpose()*world_R_body.matrix();
+  Eigen::MatrixXd D(1, 3);
+  D = -plane_normal.transpose() * world_R_body.matrix();
 
   Eigen::Vector<double, 1> residual;
-  residual = -plane_normal.transpose()*(world_R_body.matrix()*Eigen::Vector3d(point.x, point.y, point.z) + world_position - point_in_plane);
+  residual =
+      -plane_normal.transpose() *
+      (world_R_body.matrix() * Eigen::Vector3d(point.x, point.y, point.z) +
+       world_position - point_in_plane);
 
   const Eigen::Matrix<double, 24, 1> covariance_H_t =
       covariance * H.transpose();
@@ -229,7 +241,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point, Eigen::Vector<
 
   // Covariance and state update
   covariance -= covariance_H_t * SLLT.solve(H) * covariance;
-  
+
   world_R_body = world_R_body * gtsam::Rot3::Expmap(delta_state.segment<3>(0));
   world_position += delta_state.segment<3>(3);
   world_linearVelocity += delta_state.segment<3>(6);
@@ -239,19 +251,18 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point, Eigen::Vector<
   body_linearAcceleration += delta_state.segment<3>(21);
 
   // Estimate theta
-  Eigen::Vector3d theta = gtsam::Rot3::Logmap(world_R_body*world_R_body_hat);
+  Eigen::Vector3d theta = gtsam::Rot3::Logmap(world_R_body * world_R_body_hat);
   double norm_theta_div_2 = theta.norm() / 2.0;
   Eigen::Matrix<double, 24, 24> Jt;
-  Jt.block<3, 3>(0, 0) =
-      Eigen::Matrix3d::Identity() - skewSymmetric(theta / 2.0) +
-      (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
-                  std::sin(norm_theta_div_2)) *
-          skewSymmetric(theta) / theta.norm();
+  Jt.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() -
+                         skewSymmetric(theta / 2.0) +
+                         (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
+                                    std::sin(norm_theta_div_2)) *
+                             skewSymmetric(theta) / theta.norm();
   Jt.block<3, 21>(0, 3).array() = 0.0;
   Jt.block<21, 3>(3, 0).array() = 0.0;
   Jt.block<21, 21>(3, 3) = Eigen::Matrix<double, 21, 21>::Identity();
   covariance = Jt.transpose() * covariance * Jt;
-
 }
 
 void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
@@ -269,7 +280,8 @@ void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
   Fx.block<3, 3>(world_position_index, world_linearVelocity_index) = I3dt;
 
   // TODO
-  Fx.block<3, 3>(world_linearVelocity_index, world_R_body_index) = world_R_body.matrix()*skewSymmetric(body_linearAcceleration)*dt;
+  Fx.block<3, 3>(world_linearVelocity_index, world_R_body_index) =
+      world_R_body.matrix() * skewSymmetric(body_linearAcceleration) * dt;
   Fx.block<3, 3>(world_linearVelocity_index, world_gravity_index) = I3dt;
 
   Fx.block<3, 3>(world_linearVelocity_index, body_linearAcceleration_index) =
@@ -290,24 +302,25 @@ void PointLIO::propagateForwardInPlace(const double _stamp) noexcept {
 //     return normalVec;
 // }
 
-Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd& points) {
-    // Center the points
-    Eigen::Vector3d centroid = points.colwise().mean();
-    Eigen::MatrixXd centered = points.rowwise() - centroid.transpose();
+Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points) {
+  // Center the points
+  Eigen::Vector3d centroid = points.colwise().mean();
+  Eigen::MatrixXd centered = points.rowwise() - centroid.transpose();
 
-    // Compute SVD
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd(centered, Eigen::ComputeThinV);
-    Eigen::Vector3d normal = svd.matrixV().col(2); // Right singular vector corresponding to smallest singular value
+  // Compute SVD
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd(centered, Eigen::ComputeThinV);
+  Eigen::Vector3d normal = svd.matrixV().col(
+      2); // Right singular vector corresponding to smallest singular value
 
-    return normal;
+  return normal;
 }
 
-  double PointLIO::sampleFromGaussian(double mean, double stddev) {
+double PointLIO::sampleFromGaussian(double mean, double stddev) {
   // Function to sample a point from a Gaussian distribution
 
-      std::normal_distribution<double> dist(mean, stddev);
+  std::normal_distribution<double> dist(mean, stddev);
 
-      return dist(gen);
-  }
+  return dist(gen);
+}
 
 } // namespace point_lio

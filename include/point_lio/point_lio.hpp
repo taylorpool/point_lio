@@ -18,7 +18,6 @@
 #include <chrono>
 #include <optional>
 
-
 namespace point_lio {
 
 // using Stamp = std::chrono::time_point<std::chrono::system_clock,
@@ -37,13 +36,15 @@ struct PointLIOParams {
   size_t imuInitializationQuota;
 };
 
+Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points);
+
 class PointLIO {
 public:
   PointLIOParams m_params;
 
   std::deque<Imu> m_imuBuffer;
-  
-  point_lio::KDTree KDT;  
+
+  point_lio::KDTree KDT;
 
   std::mt19937 gen;
 
@@ -90,13 +91,13 @@ public:
 
   void registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
 
-  void registerPoint(const pcl_types::PointXYZICT &point, Eigen::Vector<double, 3> plane_normal,Eigen::Vector<double, 3> point_in_plane) noexcept;
+  void registerPoint(const pcl_types::PointXYZICT &point,
+                     Eigen::Vector<double, 3> plane_normal,
+                     Eigen::Vector<double, 3> point_in_plane) noexcept;
 
   void propagateForwardInPlace(const double stamp) noexcept;
 
   // Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs);
-
-  Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd& points);
 
   double sampleFromGaussian(double mean, double stddev);
 };

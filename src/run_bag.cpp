@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) noexcept {
           {
             nav_msgs::Odometry odomMsg;
             odomMsg.header.frame_id = "world";
-            odomMsg.header.stamp = imuMsg->header.stamp;
+            odomMsg.header.stamp = scanMsg->header.stamp;
             odomMsg.pose.pose.position.x = pointLIO.world_position.x();
             odomMsg.pose.pose.position.y = pointLIO.world_position.y();
             odomMsg.pose.pose.position.z = pointLIO.world_position.z();
