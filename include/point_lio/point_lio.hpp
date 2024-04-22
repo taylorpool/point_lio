@@ -48,8 +48,6 @@ public:
 
   point_lio::KDTree KDT;
 
-  std::mt19937 gen;
-
   Stamp stamp;
   gtsam::Rot3 world_R_body;
   Eigen::Vector3d world_position;
@@ -95,7 +93,6 @@ public:
 
   // Eigen::Vector3d computeNormalVector(const Eigen::Vector4d& planeCoeffs);
 
-  double sampleFromGaussian(double mean, double stddev);
 };
 
 } // namespace point_lio

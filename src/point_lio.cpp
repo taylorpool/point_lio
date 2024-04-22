@@ -84,8 +84,6 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
   Fw(23, 11) = 1.0;
 
   covariance = Eigen::Matrix<double, 24, 24>::Identity();
-
-  gen.seed(0);
 }
 
 void PointLIO::registerImu(const Imu &imu) noexcept {
@@ -201,7 +199,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
 
   Eigen::Vector<double, 1> hl;
   hl = -plane_normal.transpose() *
-       (world_R_body * (world_point - Eigen::Vector3d(nlx, nly, nlz)) +
+       (world_R_body * world_point +
         world_position - point_in_plane);
   if (hl(0) > 1e-6) {
     KDT.build2(point.getVec3Map().cast<double>());
@@ -306,14 +304,6 @@ Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points) {
       2); // Right singular vector corresponding to smallest singular value
 
   return normal;
-}
-
-double PointLIO::sampleFromGaussian(double mean, double stddev) {
-  // Function to sample a point from a Gaussian distribution
-
-  std::normal_distribution<double> dist(mean, stddev);
-
-  return dist(gen);
 }
 
 } // namespace point_lio
