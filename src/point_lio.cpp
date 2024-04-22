@@ -184,7 +184,7 @@ void PointLIO::registerScan(const pcl_types::LidarScanStamped &scan) noexcept {
     double nly = sampleFromGaussian(0, R_lidar(1,1));
     double nlz = sampleFromGaussian(0, R_lidar(2,2));
     
-    Eigen::MatrixXd nearest_points = KDT.findNearestNeighbors(point);
+    Eigen::MatrixXd nearest_points = KDT.findNearestNeighbors(Eigen::Vector3d(point.x, point.y, point.z));
     Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
     Eigen::Vector<double, 3> point_in_plane = nearest_points.block<1,3>(0,0); // Taking the first point from the 5 nearest points  Eigen::Vector<double, 1> residual;
     Eigen::Vector<double, 1> hl;

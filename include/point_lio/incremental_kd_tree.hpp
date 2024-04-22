@@ -25,6 +25,8 @@ struct Node {
 
     Node(Eigen::Vector3d point);
 };
+
+Node::Ptr root;
 std::mutex treeMutex;
 struct CompareDist {
     bool operator()(std::pair<double, Eigen::Vector3d> const& a,
@@ -38,7 +40,7 @@ public:
     // KDTree() : root(nullptr) {}
     KDTree();
     std::vector<std::pair<Eigen::Vector3d, bool>> operationLogger;
-    Node::Ptr root;
+    // Node::Ptr root;
     double alpha; 
 
     Node::Ptr removeNode(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
@@ -46,7 +48,8 @@ public:
     void reBalance(Node::Ptr root, unsigned depth);
     bool searchRec(Node::Ptr root, Eigen::Vector3d point, unsigned depth);
     bool search(Node::Ptr root, Eigen::Vector3d point);
-    Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d& target, const Eigen::MatrixXd& points, int near);
+    // Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d& target, const Eigen::MatrixXd& points, int near);
+    Eigen::MatrixXd findNearestNeighbors(const Eigen::Vector3d& target);
     void lockUpdates();
     void unlockUpdates();
     Node::Ptr newNode(Eigen::Vector3d point);
