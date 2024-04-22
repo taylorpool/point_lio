@@ -201,7 +201,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
   hl = -plane_normal.transpose() *
        (world_R_body * world_point +
         world_position - point_in_plane);
-  if (hl(0) > 1e-6) {
+  if (abs(hl(0)) > 0.1) {
     KDT.build2(point.getVec3Map().cast<double>());
   }
 
