@@ -184,6 +184,9 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
 }
 
 void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
+  if (!imuBias_accelerometer || !imuBias_gyroscope) {
+    return;
+  }
 
   propagateForwardInPlace(point.timeOffset - stamp);
 
@@ -199,8 +202,7 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
 
   Eigen::Vector<double, 1> hl;
   hl = -plane_normal.transpose() *
-       (world_R_body * world_point +
-        world_position - point_in_plane);
+       (world_R_body * world_point + world_position - point_in_plane);
   if (abs(hl(0)) > 0.1) {
     KDT.build2(point.getVec3Map().cast<double>());
   }
