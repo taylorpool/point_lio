@@ -4,6 +4,8 @@
 #include "point_lio/ekf.hpp"
 #include "point_lio/incremental_kd_tree.hpp"
 
+#include "ivox/ivox3d.h"
+
 #include "pcl_types/pcl_types.hpp"
 
 #include "incremental_kd_tree.hpp"
@@ -27,7 +29,7 @@ struct Imu {
   Eigen::Vector3d body_measuredAngularVelocity;
 };
 
-[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v);
+[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) noexcept;
 
 struct PointLIOParams {
   size_t imuInitializationQuota;
@@ -48,6 +50,8 @@ private:
   void boxplus(const Eigen::Vector<double, 24> &deltaState) noexcept;
 
   void propagateForwardInPlace(const double stamp) noexcept;
+
+  faster_lio::IVox<3, IVoxNodeType::DEFAULT, pcl_types::PointXYZICT> m_ivox;
 
 public:
   PointLIOParams m_params;

@@ -27,7 +27,7 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
                                  sin_theta * axis.y(), sin_theta * axis.z());
 }
 
-[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) {
+[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) noexcept {
   return (Eigen::Matrix3d() << 0, -v.z(), v.y(), v.z(), 0, -v.x(), -v.y(),
           v.x(), 0)
       .finished();
@@ -320,73 +320,65 @@ void PointLIO::registerPoint(const pcl_types::PointXYZICT &point) noexcept {
 
   propagateForwardInPlace(point.timeOffset - stamp);
 
-  const Eigen::Vector3d world_point =
-      world_R_body * point.getVec3Map().cast<double>() + world_position;
+  // const Eigen::Vector3d world_point =
+  //     world_R_body * point.getVec3Map().cast<double>() + world_position;
 
-  const Eigen::Matrix<double, 5, 3> nearest_points =
-      KDT.findNearestNeighbors(world_point);
+  // const Eigen::Matrix<double, 5, 3> nearest_points =
+  //     KDT.findNearestNeighbors(world_point);
 
-  const Eigen::Vector<double, 3> plane_normal = getPlaneNormal(nearest_points);
-  const Eigen::Vector<double, 3> point_in_plane =
-      nearest_points.row(0).transpose();
+  // const Eigen::Vector<double, 3> plane_normal =
+  // getPlaneNormal(nearest_points); const Eigen::Vector<double, 3>
+  // point_in_plane =
+  //     nearest_points.row(0).transpose();
 
-  Eigen::Vector<double, 1> hl;
-  hl = -plane_normal.transpose() *
-       (world_R_body * world_point + world_position - point_in_plane);
-  if (abs(hl(0)) > 0.1) {
-    KDT.build2(point.getVec3Map().cast<double>());
-  }
+  // Eigen::Vector<double, 1> hl;
+  // hl = -plane_normal.transpose() *
+  //      (world_R_body * world_point + world_position - point_in_plane);
+  // if (abs(hl(0)) > 0.1) {
+  //   KDT.build2(point.getVec3Map().cast<double>());
+  // }
 
-  Eigen::Matrix<double, 1, 24> H;
-  H.block<1, 18>(0, 6).array() = 0.0;
-  H.block<1, 3>(0, 0) =
-      -plane_normal.transpose() * world_R_body.matrix() *
-      skewSymmetric(Eigen::Vector3d(point.x, point.y, point.z));
-  H.block<1, 3>(0, 3) = plane_normal.transpose();
+  // const Eigen::Matrix<double, 1, 3> D_lidar =
+  //     -plane_normal.transpose() * world_R_body.matrix();
 
-  Eigen::MatrixXd D(1, 3);
-  D = -plane_normal.transpose() * world_R_body.matrix();
+  // Eigen::Matrix<double, 1, 24> H_lidar;
+  // H_lidar.block<1, 3>(0, 0) =
+  //     D_lidar * skewSymmetric(Eigen::Vector3d(point.x, point.y, point.z));
+  // H_lidar.block<1, 3>(0, 3) = plane_normal.transpose();
+  // H_lidar.block<1, 18>(0, 6).array() = 0.0;
 
-  Eigen::Vector<double, 1> residual;
-  residual =
-      -plane_normal.transpose() *
-      (world_R_body.matrix() * Eigen::Vector3d(point.x, point.y, point.z) +
-       world_position - point_in_plane);
+  // const Eigen::Vector<double, 1> residual = plane_normal.dot(
+  //     world_R_body * point.getVec3Map() + world_position - plane_centroid);
 
-  const Eigen::Matrix<double, 24, 1> covariance_H_t =
-      covariance * H.transpose();
+  // const Eigen::Matrix<double, 24, 1> covariance_H_t =
+  //     covariance * H_lidar.transpose();
 
-  const Eigen::Matrix<double, 1, 1> S =
-      H * covariance_H_t + D * R_lidar * D.transpose();
+  // const Eigen::Matrix<double, 6, 6> S =
+  //     H_lidar * covariance_H_t + D_lidar * R_lidar * D_lidar.transpose();
 
-  const auto SLLT = S.llt();
-  const Eigen::Vector<double, 24> delta_state =
-      covariance_H_t * SLLT.solve(residual);
+  // const Eigen::LDLT<Eigen::Matrix<double, 6, 6>> SLDLT = S.ldlt();
 
-  // Covariance and state update
-  covariance -= covariance_H_t * SLLT.solve(H) * covariance;
+  // const Eigen::Vector<double, 24> deltaState =
+  //     covariance_H_t * SLDLT.solve(residual);
 
-  world_R_body = world_R_body * gtsam::Rot3::Expmap(delta_state.segment<3>(0));
-  world_position += delta_state.segment<3>(3);
-  world_linearVelocity += delta_state.segment<3>(6);
-  imuBias_gyroscope.value() += delta_state.segment<3>(9);
-  imuBias_accelerometer.value() += delta_state.segment<3>(12);
-  body_angularVelocity += delta_state.segment<3>(18);
-  body_linearAcceleration += delta_state.segment<3>(21);
+  // boxplus(deltaState);
 
-  // Estimate theta
-  const Eigen::Vector3d theta = delta_state.segment<3>(0);
-  double norm_theta_div_2 = theta.norm() / 2.0;
-  Eigen::Matrix<double, 24, 24> Jt;
-  Jt.block<3, 3>(0, 0) = Eigen::Matrix3d::Identity() -
-                         skewSymmetric(theta / 2.0) +
-                         (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
-                                    std::sin(norm_theta_div_2)) *
-                             skewSymmetric(theta) / theta.norm();
-  Jt.block<3, 21>(0, 3).array() = 0.0;
-  Jt.block<21, 3>(3, 0).array() = 0.0;
-  Jt.block<21, 21>(3, 3) = Eigen::Matrix<double, 21, 21>::Identity();
-  covariance = Jt.transpose() * covariance * Jt;
+  // // Estimate theta
+  // const Eigen::Vector3d theta = deltaState.segment<3>(0);
+
+  // double norm_theta_div_2 = theta.norm() / 2.0;
+
+  // const Eigen::Matrix<double, 3, 3> A =
+  //     Eigen::Matrix3d::Identity() - skewSymmetric(theta / 2.0) +
+  //     (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
+  //                std::sin(norm_theta_div_2)) *
+  //         skewSymmetric(theta) / theta.norm();
+  // setFromMatrix33(J, A.inverse().transpose(), 0, 0);
+
+  // covariance =
+  //     J * (covariance - covariance_H_t * SLDLT.solve(H_lidar * covariance)) *
+  //     J.transpose();
+
   stamp = point.timeOffset;
 }
 
