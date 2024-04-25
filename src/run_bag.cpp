@@ -25,7 +25,10 @@ int main(int argc, char *argv[]) noexcept {
   rosbag::Bag inputbag(argv[1], rosbag::bagmode::Read);
   rosbag::Bag outputBag(argv[2], rosbag::bagmode::Write);
 
-  point_lio::PointLIO pointLIO;
+  point_lio::PointLIOParams params;
+  params.imuInitializationQuota = 100;
+
+  point_lio::PointLIO pointLIO(params);
 
   for (const auto &msg : rosbag::View(inputbag)) {
     const auto topic = msg.getTopic();
@@ -55,32 +58,36 @@ int main(int argc, char *argv[]) noexcept {
           }
         }
       }
-    } else if (dataType == "geometry_msgs/Vector3Stamped") {
-      const auto pointMsg = msg.instantiate<geometry_msgs::Vector3Stamped>();
-      if (pointMsg != nullptr) {
-        pcl_types::PointXYZICT point;
-        point.timeOffset = pointMsg->header.stamp.toSec();
-        point.x = static_cast<float>(pointMsg->vector.x);
-        point.y = static_cast<float>(pointMsg->vector.y);
-        point.z = static_cast<float>(pointMsg->vector.z);
-        pointLIO.registerPoint(point);
+      // } else if (dataType == "geometry_msgs/Vector3Stamped") {
+      //   const auto pointMsg =
+      //   msg.instantiate<geometry_msgs::Vector3Stamped>(); if (pointMsg !=
+      //   nullptr) {
+      //     pcl_types::PointXYZICT point;
+      //     point.timeOffset = pointMsg->header.stamp.toSec();
+      //     point.x = static_cast<float>(pointMsg->vector.x);
+      //     point.y = static_cast<float>(pointMsg->vector.y);
+      //     point.z = static_cast<float>(pointMsg->vector.z);
+      //     pointLIO.registerPoint(point);
 
-        {
-          nav_msgs::Odometry odomMsg;
-          odomMsg.header.frame_id = "world";
-          odomMsg.header.stamp = pointMsg->header.stamp;
-          odomMsg.pose.pose.position.x = pointLIO.world_position.x();
-          odomMsg.pose.pose.position.y = pointLIO.world_position.y();
-          odomMsg.pose.pose.position.z = pointLIO.world_position.z();
-          const auto world_R_body = pointLIO.world_R_body.toQuaternion();
-          odomMsg.pose.pose.orientation.w = world_R_body.w();
-          odomMsg.pose.pose.orientation.x = world_R_body.x();
-          odomMsg.pose.pose.orientation.y = world_R_body.y();
-          odomMsg.pose.pose.orientation.z = world_R_body.z();
+      //     {
+      //       nav_msgs::Odometry odomMsg;
+      //       odomMsg.header.frame_id = "world";
+      //       odomMsg.header.stamp = pointMsg->header.stamp;
+      //       odomMsg.pose.pose.position.x = pointLIO.world_position.x();
+      //       odomMsg.pose.pose.position.y = pointLIO.world_position.y();
+      //       odomMsg.pose.pose.position.z = pointLIO.world_position.z();
+      //       const auto world_R_body = pointLIO.world_R_body.toQuaternion();
+      //       odomMsg.pose.pose.orientation.w = world_R_body.w();
+      //       odomMsg.pose.pose.orientation.x = world_R_body.x();
+      //       odomMsg.pose.pose.orientation.y = world_R_body.y();
+      //       odomMsg.pose.pose.orientation.z = world_R_body.z();
 
-          outputBag.write(odometryTopic, msg.getTime(), odomMsg);
-        }
-      }
+      //       std::cout << "LIDAR: " << pointLIO.world_position.transpose() <<
+      //       "\n";
+
+      //       outputBag.write(odometryTopic, msg.getTime(), odomMsg);
+      //     }
+      //   }
     }
   }
 
