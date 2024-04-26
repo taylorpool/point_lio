@@ -16,6 +16,19 @@ static_assert(sizeof(float32_t) == 4, "float32_t is not the right size");
 using float64_t = std::conditional<sizeof(double) == 8, double, float>::type;
 static_assert(sizeof(float64_t) == 8, "float64_t is not the right size");
 
+struct PointXYZI {
+  float32_t x;
+  float32_t y;
+  float32_t z;
+  float32_t _;
+  uint16_t intensity;
+
+  [[nodiscard]] Eigen::Map<Eigen::Vector<float32_t, 3>> getVec3Map() noexcept;
+
+  [[nodiscard]] Eigen::Map<const Eigen::Vector<float32_t, 3>>
+  getVec3Map() const noexcept;
+};
+
 struct PointXYZICT {
   float32_t x;
   float32_t y;

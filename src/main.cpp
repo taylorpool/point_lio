@@ -13,7 +13,10 @@ int main(int argc, char *argv[]) {
   ros::NodeHandle publicNode;
   ros::NodeHandle privateNode;
 
-  point_lio::PointLIO pointLIO;
+  point_lio::PointLIOParams params;
+  params.imuInitializationQuota = 100;
+
+  point_lio::PointLIO pointLIO(params);
 
   auto odometryPublisher =
       publicNode.advertise<nav_msgs::Odometry>("/odometry", 2);

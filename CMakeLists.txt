@@ -85,6 +85,26 @@ target_link_libraries(PCLTypesROS1
     ${catkin_LIBRARIES}
 )
 
+add_library(IVox INTERFACE)
+target_sources(IVox
+    INTERFACE
+    FILE_SET
+        ivox_headers
+    TYPE
+        HEADERS
+    BASE_DIRS
+        include
+    FILES
+        include/ivox/ivox3d.h
+        include/ivox/eigen_types.h
+        include/ivox/ivox3d_node.hpp
+        include/ivox/hilbert.hpp
+)
+target_link_libraries(IVox
+    INTERFACE
+    PCLTypes
+)
+
 add_library(VelodyneDecoder
     src/velodyne_decoder.cpp
     src/vlp16.cpp
@@ -174,6 +194,7 @@ target_link_libraries(PointLIO
     gtsam
     gtsam_unstable
     PCLTypes
+    IVox
 )
 
 add_library(PointLIOROS1
@@ -224,6 +245,7 @@ target_link_libraries(to_point_bag
 
 install(
     TARGETS
+        IVox
         PCLTypes
         PCLTypesROS1
         VelodyneDecoder
@@ -252,6 +274,8 @@ install(
         point_lio_headers
     FILE_SET
         point_lio_ros1_headers
+    FILE_SET
+        ivox_headers
 )
 
 install(EXPORT PointLIOTargets
