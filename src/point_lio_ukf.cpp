@@ -245,8 +245,7 @@ void PointLIO::statePropagateForwardInPlace(const double dt, Eigen::MatrixXd &si
   }
 }
 
-void PointLIO::covariancePropagateForwardInPlace(const double dt) noexcept {
-
+void PointLIO::covariancePropagateForwardInPlace(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt) noexcept {
   generateSigmaPoints(&state, &covariance, &sigma_points, dt);
   computeMeanAndCovariance(&state, &covariance, &sigma_points);
 }
@@ -430,7 +429,7 @@ void PointLIO::generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::Ma
     statePropagateForwardInPlace(dt, &sigma_points);
 }
 
-void PointLIO::computeMeanAndCovariance(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points) {
+Eigen::VectorXd PointLIO::computeMeanAndCovariance(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points) {
     int n = X.rows();        // Dimension of sigma point
     int L = X.cols();        // Number of sigma points
 
@@ -462,9 +461,12 @@ void PointLIO::computeMeanAndCovariance(const Eigen::VectorXd &state, const Eige
             Wc(i) = 1/(2*(lambda+L));
         }
         
-        Eigen::VectorXd diff = X.col(i) - mean;
-        covariance += Wc(i) * (diff * diff.transpose()) + Q;
+        Eigen::VectorXd diff = state.col(i) - sigma_mean;
+        covariance += Wc(i) * (diff * diff.transpose());
+
     }
+
+    return sigma_mean;
 }
 
 } // namespace point_lio

@@ -45,9 +45,7 @@ private:
 
   void statePropagateForwardInPlace(const double dt) noexcept;
 
-  void covariancePropagateForwardInPlace(const double dt) noexcept;
-
-  void statePropagateForwardInPlace(const double dt, Eigen::MatrixXd sigma_points) noexcept;
+  void PointLIO::covariancePropagateForwardInPlace(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt) noexcept;
 
   void boxplus(const Eigen::Vector<double, 24> &deltaState) noexcept;
 
@@ -83,7 +81,7 @@ public:
 
   Eigen::Matrix<double, 12, 12> Q;
 
-  Eigen::Matrix<double, 24, 24> covariance;
+  Eigen::Matrix<double, 22, 22> covariance;
 
   // Constants
   static constexpr int world_R_body_index = 0;
@@ -110,14 +108,13 @@ public:
 
   // UKF stuff
   Eigen::VectorXd state;
-  // Eigen::VectorXd sigma_mean;
-  // Eigen::MatrixXd sigma_covariance;
   Eigen::MatrixXd sigma_points;
   const double alpha = 1;
   const double beta = 2;
   const double kappa = 0;
-  Eigen::MatrixXd generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance);
-  void computeMeanAndCovariance(const Eigen::MatrixXd &sigma_points);
+  void generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt);
+  Eigen::VectorXd computeMeanAndCovariance(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points);
+  void statePropagateForwardInPlace(const double dt, Eigen::MatrixXd &sigma_points) noexcept;
 };
 
 } // namespace point_lio
