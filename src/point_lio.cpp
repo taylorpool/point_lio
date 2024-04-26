@@ -396,8 +396,7 @@ Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points) {
 
   // Compute SVD
   Eigen::JacobiSVD<Eigen::MatrixXd> svd(centered, Eigen::ComputeThinV);
-  Eigen::Vector3d normal = svd.matrixV().col(
-      2); // Right singular vector corresponding to smallest singular value
+  Eigen::Vector3d normal = svd.matrixV().col(2); // Right singular vector corresponding to smallest singular value
 
   return normal;
 }
