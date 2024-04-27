@@ -83,6 +83,10 @@ public:
 
   Eigen::Matrix<double, 22, 22> covariance;
 
+  Eigen::Matrix<double, 22, 22> new_covariance;
+
+  Eigen::Matrix<double, 22, 22> St;
+
   // Constants
   static constexpr int world_R_body_index = 0;
   static constexpr int world_position_index = 3;
@@ -109,12 +113,15 @@ public:
   // UKF stuff
   Eigen::VectorXd state;
   Eigen::MatrixXd sigma_points;
+  Eigen::VectorXd sigma_mean;
+  Eigen::VectorXd meas_mean; 
   const double alpha = 1;
   const double beta = 2;
   const double kappa = 0;
   void generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt);
-  Eigen::VectorXd computeMeanAndCovariance(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points);
+  void computeMeanAndCovariance(const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, Eigen::VectorXd &sigma_mean);
   void statePropagateForwardInPlace(const double dt, Eigen::MatrixXd &sigma_points) noexcept;
+  void computeCovariance(const Eigen::MatrixXd &new_covariance, const Eigen::MatrixXd &meas_pred, Eigen::MatrixXd &sigma_points, Eigen::VectorXd &sigma_mean, Eigen::VectorXd &meas_mean);
 };
 
 } // namespace point_lio

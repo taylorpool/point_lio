@@ -176,6 +176,7 @@ add_library(PointLIO
     src/incremental_kd_tree.cpp
     src/ekf.cpp
     src/point_lio.cpp
+    src/point_lio_ukf.cpp
 )
 target_sources(PointLIO
     PUBLIC
@@ -189,6 +190,7 @@ target_sources(PointLIO
         include/point_lio/point_lio.hpp
         include/point_lio/ekf.hpp
         include/point_lio/incremental_kd_tree.hpp
+        include/point_lio/point_lio_ukf.hpp
 )
 target_link_libraries(PointLIO
     gtsam

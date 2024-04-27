@@ -180,7 +180,9 @@ void initializeJ(Eigen::SparseMatrix<double, Eigen::RowMajor> &J) noexcept {
   Q.block<3, 3>(noise_accelerometer_index, noise_accelerometer_index) =
       Eigen::Matrix3d::Identity() * 0.00001;
 
-  covariance = Eigen::Matrix<double, 24, 24>::Identity() * 1e-2;
+  covariance = Eigen::Matrix<double, 22, 22>::Identity() * 1e-2;
+
+  St = Eigen::Matrix<double, 22, 22>::Identity() * 1e-2;
 
   state.segment<4>(0) = world_R_body.toQuaternion();
   state.segment<3>(4) = world_position;
@@ -227,10 +229,9 @@ void PointLIO::initializeState() noexcept {
 }
 
 void PointLIO::statePropagateForwardInPlace(const double dt) noexcept {
-  world_linearVelocity +=
-      (world_R_body.rotate(body_linearAcceleration) + world_gravity) * dt;
-  world_R_body = world_R_body * gtsam::Rot3::Expmap(body_angularVelocity * dt);
-  world_position += world_linearVelocity * dt;
+  state.segment<3>(7) += (world_R_body.rotate(state.segment<3>(19)) + world_gravity) * dt;
+  state.segment<4>(0) = (world_R_body * gtsam::Rot3::Expmap(state.segment<3>(16) * dt)).toQuaternion();
+  state.segment<3>(4) += state.segment<3>(7) * dt;
 }
 
 void PointLIO::statePropagateForwardInPlace(const double dt, Eigen::MatrixXd &sigma_points) noexcept {
@@ -239,19 +240,19 @@ void PointLIO::statePropagateForwardInPlace(const double dt, Eigen::MatrixXd &si
   int L = sigma_points.cols();        // Number of sigma points
 
   for (int i = 0; i < L; ++i) {
-      sigma_points.block<4,1>(0,i) = sigma_points.block<4,1>(0,i) * gtsam::Rot3::Expmap(body_angularVelocity * dt);
-      sigma_points.block<3,1>(4,i) += world_linearVelocity * dt;
-      sigma_points.block<3,1>(7,i) += (world_R_body.rotate(body_linearAcceleration) + world_gravity) * dt;
+      sigma_points.block<4,1>(0,i) = sigma_points.block<4,1>(0,i) * gtsam::Rot3::Expmap( state.segment<3>(16)* dt);
+      sigma_points.block<3,1>(4,i) += state.segment<3>(7) * dt;
+      sigma_points.block<3,1>(7,i) += (world_R_body.rotate(state.segment<3>(19)) + world_gravity) * dt;
   }
 }
 
 void PointLIO::covariancePropagateForwardInPlace(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt) noexcept {
   generateSigmaPoints(&state, &covariance, &sigma_points, dt);
-  computeMeanAndCovariance(&state, &covariance, &sigma_points);
+  computeMeanAndCovariance(&covariance, &sigma_points, &sigma_mean);
 }
 
 void PointLIO::propagateForwardInPlace(const double dt) noexcept {
-  covariancePropagateForwardInPlace(dt);
+  covariancePropagateForwardInPlace(&state, &covariance, &sigma_points, dt);
   statePropagateForwardInPlace(dt);
 }
 
@@ -280,42 +281,35 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
       initializeState();
     }
   } else if (imu.stamp > stamp) {
+
+    // Predict
     propagateForwardInPlace(imu.stamp - stamp);
 
-    Eigen::Vector<double, 6> residual;
-    residual.head<3>() = imu.body_measuredAngularVelocity -
-                         body_angularVelocity - imuBias_gyroscope.value();
-    residual.tail<3>() = imu.body_measuredLinearAcceleration -
-                         body_linearAcceleration -
-                         imuBias_accelerometer.value();
+    // Update
+    generateSigmaPoints(&sigma_mean, &covariance, &sigma_points, dt);
 
-    const Eigen::Matrix<double, 24, 6> covariance_H_t =
-        covariance * H_imu.transpose();
+    Eigen::MatrixXd meas_pred = sigma_points; 
+    for (int i = 0; i < sigma_points.cols(); ++i) {
+      meas_pred.block<3,1>(16,i) -= sigma_points.block<3,1>(16,i) - imuBias_gyroscope.value();
+      meas_pred.block<3,1>(19,i) -= sigma_points.block<3,1>(19,i) - imuBias_accelerometer.value(); 
 
-    const Eigen::Matrix<double, 6, 6> S = H_imu * covariance_H_t + R_imu;
+    Eigen::MatrixXd St; 
+    computeMeanAndCovariance(&St, &meas_pred, &meas_mean);
 
-    const Eigen::LDLT<Eigen::Matrix<double, 6, 6>> SLDLT = S.ldlt();
+    computeCovariance(&new_covariance, &meas_pred, &sigma_points, &sigma_mean, &meas_mean)
 
-    const Eigen::Vector<double, 24> deltaState =
-        covariance_H_t * SLDLT.solve(residual);
 
-    boxplus(deltaState);
+    const Eigen::LDLT<Eigen::Matrix<double, 22, 22>> SLDLT = St.ldlt();
 
-    // Estimate theta
-    const Eigen::Vector3d theta = deltaState.segment<3>(0);
+    const Eigen::MatrixXd K = new_covariance * SLDLT.solve(Eigen::MatrixXd::Identity(St.rows(), St.cols()));
 
-    double norm_theta_div_2 = theta.norm() / 2.0;
+    const Eigen::VectorXd actual_meas = mean_meas;
+    actual_meas.segment<3>(16) = imu.body_measuredAngularVelocity;
+    actual_meas.segment<3>(19) = imu.body_measuredLinearAcceleration;
 
-    const Eigen::Matrix<double, 3, 3> A =
-        Eigen::Matrix3d::Identity() - skewSymmetric(theta / 2.0) +
-        (1.0 - norm_theta_div_2 * std::cos(norm_theta_div_2) /
-                   std::sin(norm_theta_div_2)) *
-            skewSymmetric(theta) / theta.norm();
-    setFromMatrix33(J, A.inverse().transpose(), 0, 0);
+    state = sigma_mean + K*(actual_meas - meas_mean);
 
-    covariance =
-        J * (covariance - covariance_H_t * SLDLT.solve(H_imu * covariance)) *
-        J.transpose();
+    covariance -= K*St*K.transpose();
 
     stamp = imu.stamp;
   }
@@ -417,7 +411,7 @@ void PointLIO::generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::Ma
     Eigen::MatrixXd A = (covariance * (n + lambda)).llt().matrixL();
 
     // Initialize sigma points matrix
-    Eigen::MatrixXd sigma_points<n, 2*n+1>;
+    // sigma_points<n, 2*n+1>;
     sigma_points.col(0) = state;  // First sigma point is the mean
 
     // Generate sigma points around the mean
@@ -429,16 +423,16 @@ void PointLIO::generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::Ma
     statePropagateForwardInPlace(dt, &sigma_points);
 }
 
-Eigen::VectorXd PointLIO::computeMeanAndCovariance(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points) {
-    int n = X.rows();        // Dimension of sigma point
-    int L = X.cols();        // Number of sigma points
+void PointLIO::computeMeanAndCovariance(const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, Eigen::VectorXd &sigma_mean) {
+    int n = sigma_points.rows();        // Dimension of sigma point
+    int L = sigma_points.cols();        // Number of sigma points
 
     const double lambda = square(alpha) * (L+kappa) - L;
     const Eigen::VectorXd Wm; 
     const Eigen::VectorXd Wc;
 
     // Initialize mean and covariance
-    Eigen::VectorXd sigma_mean = Eigen::VectorXd::Zero(n);
+    sigma_mean = Eigen::VectorXd::Zero(n);
 
     // Compute mean
     for (int i = 0; i < L; ++i) {
@@ -461,12 +455,33 @@ Eigen::VectorXd PointLIO::computeMeanAndCovariance(const Eigen::VectorXd &state,
             Wc(i) = 1/(2*(lambda+L));
         }
         
-        Eigen::VectorXd diff = state.col(i) - sigma_mean;
+        Eigen::VectorXd diff = sigma_points.col(i) - sigma_mean;
         covariance += Wc(i) * (diff * diff.transpose());
 
     }
-
-    return sigma_mean;
 }
 
+void PointLIO::computeCovariance(const Eigen::MatrixXd &new_covariance, const Eigen::MatrixXd &meas_pred, Eigen::MatrixXd &sigma_points, Eigen::VectorXd &sigma_mean, Eigen::VectorXd &meas_mean) {
+    int n = sigma_points.rows();        // Dimension of sigma point
+    int L = sigma_points.cols();        // Number of sigma points
+
+    const double lambda = square(alpha) * (L+kappa) - L;
+    const Eigen::VectorXd Wm; 
+    const Eigen::VectorXd Wc;
+
+    // Compute covariance
+    for (int i = 0; i < L; ++i) {
+        if(i==0){
+            Wc(0) = lambda/(lambda + L) + (1-square(alpha) + beta);
+        }
+        else{
+            Wc(i) = 1/(2*(lambda+L));
+        }
+        
+        Eigen::VectorXd diff = sigma_points.col(i) - sigma_mean;
+        Eigen::VectorXd meas_diff = meas_pred.col(i) - meas_mean;
+        new_covariance += Wc(i) * (diff * meas_diff);
+
+    }
+}
 } // namespace point_lio
