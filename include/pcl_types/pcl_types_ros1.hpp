@@ -9,6 +9,9 @@
 
 namespace pcl_types::ros1 {
 
+using pcl_types::float32_t;
+using pcl_types::float64_t;
+
 template <typename T>
   requires std::is_same_v<T, float32_t>
 [[nodiscard]] consteval auto getPointField() noexcept {
@@ -60,10 +63,18 @@ template <typename T>
 [[nodiscard]] bool fromMsg(const sensor_msgs::PointCloud2 &msg,
                            pcl_types::LidarScanStamped &scan) noexcept;
 
+// TODO use ranges here
+[[nodiscard]] bool toMsg(const std::vector<pcl_types::PointXYZI> &points,
+                         sensor_msgs::PointCloud2 &msg) noexcept;
+
+// TODO use ranges here
 [[nodiscard]] bool toMsg(const std::vector<pcl_types::PointXYZICT> &points,
                          sensor_msgs::PointCloud2 &msg) noexcept;
 
 [[nodiscard]] bool toMsg(const pcl_types::LidarScanStamped &scan,
+                         sensor_msgs::PointCloud2 &msg) noexcept;
+
+[[nodiscard]] bool toMsg(const std::vector<Eigen::Vector3d> &points,
                          sensor_msgs::PointCloud2 &msg) noexcept;
 
 } // namespace pcl_types::ros1

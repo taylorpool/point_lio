@@ -2,26 +2,19 @@
 
 namespace pcl_types {
 
-[[nodiscard]] Eigen::Map<Eigen::Vector3f> PointXYZICT::getVec3Map() noexcept {
-  return Eigen::Map<Eigen::Vector3f>(&x);
+void serialize(std::vector<uint8_t> &vec,
+               const pcl_types::PointXYZ &point) noexcept {
+  serialize(vec, point.x);
+  serialize(vec, point.y);
+  serialize(vec, point.z);
 }
 
-[[nodiscard]] Eigen::Map<const Eigen::Vector3f>
-PointXYZICT::getVec3Map() const noexcept {
-  return Eigen::Map<const Eigen::Vector3f>(&x);
-}
-
-[[nodiscard]] Eigen::Map<Eigen::Vector4f> PointXYZICT::getVec4Map() noexcept {
-  return Eigen::Map<Eigen::Vector4f>(&x);
-}
-
-[[nodiscard]] Eigen::Map<const Eigen::Vector4f>
-PointXYZICT::getVec4Map() const noexcept {
-  return Eigen::Map<const Eigen::Vector4f>(&x);
-}
-
-[[nodiscard]] Eigen::Vector3d PointXYZICT::getLocation() const noexcept {
-  return getVec3Map().cast<double>();
+void serialize(std::vector<uint8_t> &vec,
+               const pcl_types::PointXYZI &point) noexcept {
+  serialize(vec, point.x);
+  serialize(vec, point.y);
+  serialize(vec, point.z);
+  serialize(vec, point.intensity);
 }
 
 void serialize(std::vector<uint8_t> &vec,
@@ -32,6 +25,18 @@ void serialize(std::vector<uint8_t> &vec,
   serialize(vec, point.intensity);
   serialize(vec, point.channel);
   serialize(vec, point.timeOffset);
+}
+
+void serialize(std::vector<uint8_t> &vec, const Eigen::Vector3f data) noexcept {
+  serialize(vec, data.x());
+  serialize(vec, data.y());
+  serialize(vec, data.z());
+}
+
+void serialize(std::vector<uint8_t> &vec, const Eigen::Vector3d data) noexcept {
+  serialize(vec, data.x());
+  serialize(vec, data.y());
+  serialize(vec, data.z());
 }
 
 } // namespace pcl_types
