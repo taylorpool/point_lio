@@ -296,8 +296,7 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     Eigen::MatrixXd St; 
     computeMeanAndCovariance(&St, &meas_pred, &meas_mean);
 
-    computeCovariance(&new_covariance, &meas_pred, &sigma_points, &sigma_mean, &meas_mean)
-
+    computeCovariance(&new_covariance, &meas_pred, &sigma_points, &sigma_mean, &meas_mean);
 
     const Eigen::LDLT<Eigen::Matrix<double, 22, 22>> SLDLT = St.ldlt();
 
@@ -312,6 +311,7 @@ void PointLIO::registerImu(const Imu &imu) noexcept {
     covariance -= K*St*K.transpose();
 
     stamp = imu.stamp;
+  }
   }
 }
 
