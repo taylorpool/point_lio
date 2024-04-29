@@ -85,22 +85,19 @@ target_link_libraries(PCLTypesROS1
     ${catkin_LIBRARIES}
 )
 
-add_library(IVox INTERFACE)
-target_sources(IVox
+add_library(VoxelGrid INTERFACE)
+target_sources(VoxelGrid
     INTERFACE
     FILE_SET
-        ivox_headers
+        voxel_grid_headers
     TYPE
         HEADERS
     BASE_DIRS
         include
     FILES
-        include/ivox/ivox3d.h
-        include/ivox/eigen_types.h
-        include/ivox/ivox3d_node.hpp
-        include/ivox/hilbert.hpp
+        include/point_lio/voxel_grid.hpp
 )
-target_link_libraries(IVox
+target_link_libraries(VoxelGrid
     INTERFACE
     PCLTypes
 )
@@ -196,7 +193,7 @@ target_link_libraries(PointLIO
     gtsam
     gtsam_unstable
     PCLTypes
-    IVox
+    VoxelGrid
 )
 
 add_library(PointLIOROS1
@@ -247,7 +244,7 @@ target_link_libraries(to_point_bag
 
 install(
     TARGETS
-        IVox
+        VoxelGrid
         PCLTypes
         PCLTypesROS1
         VelodyneDecoder
@@ -277,7 +274,7 @@ install(
     FILE_SET
         point_lio_ros1_headers
     FILE_SET
-        ivox_headers
+        voxel_grid_headers
 )
 
 install(EXPORT PointLIOTargets

@@ -38,6 +38,52 @@ namespace pcl_types::ros1 {
   return true;
 }
 
+[[nodiscard]] bool toMsg(const std::vector<pcl_types::PointXYZI> &points,
+                         sensor_msgs::PointCloud2 &msg) noexcept {
+  msg.height = 1;
+
+  msg.width = points.size();
+
+  msg.fields.resize(4);
+
+  msg.fields[0].name = "x";
+  msg.fields[0].offset = pcl_types::PointXYZI::kX_INDEX;
+  msg.fields[0].datatype = getPointField<decltype(pcl_types::PointXYZI::x)>();
+  msg.fields[0].count = 1;
+
+  msg.fields[1].name = "y";
+  msg.fields[1].offset = pcl_types::PointXYZI::kY_INDEX;
+  msg.fields[1].datatype = getPointField<decltype(pcl_types::PointXYZI::y)>();
+  msg.fields[1].count = 1;
+
+  msg.fields[2].name = "z";
+  msg.fields[2].offset = pcl_types::PointXYZI::kZ_INDEX;
+  msg.fields[2].datatype = getPointField<decltype(pcl_types::PointXYZI::z)>();
+  msg.fields[2].count = 1;
+
+  msg.fields[3].name = "intensity";
+  msg.fields[3].offset = pcl_types::PointXYZI::kINTENSITY_INDEX;
+  msg.fields[3].datatype =
+      getPointField<decltype(pcl_types::PointXYZI::intensity)>();
+  msg.fields[3].count = 1;
+
+  msg.is_bigendian = (std::endian::native == std::endian::big);
+
+  msg.point_step = pcl_types::PointXYZI::kINTENSITY_INDEX +
+                   sizeof(pcl_types::PointXYZI::intensity);
+
+  msg.row_step = msg.width * msg.point_step;
+
+  msg.data.clear();
+  msg.data.reserve(msg.row_step * msg.height);
+  for (const auto &point : points) {
+    serialize(msg.data, point);
+  }
+  msg.is_dense = false;
+
+  return true;
+}
+
 [[nodiscard]] bool toMsg(const std::vector<pcl_types::PointXYZICT> &cloud,
                          sensor_msgs::PointCloud2 &msg) noexcept {
   msg.height = 1;
@@ -80,7 +126,7 @@ namespace pcl_types::ros1 {
 
   msg.is_bigendian = (std::endian::native == std::endian::big);
 
-  msg.point_step = PointXYZICT::kSIZE;
+  msg.point_step = pcl_types::PointXYZICT::kSIZE;
 
   msg.row_step = msg.width * msg.point_step;
 
@@ -90,6 +136,7 @@ namespace pcl_types::ros1 {
     serialize(msg.data, point);
   }
   msg.is_dense = false;
+
   return true;
 }
 
@@ -97,6 +144,45 @@ namespace pcl_types::ros1 {
                          sensor_msgs::PointCloud2 &msg) noexcept {
   msg.header.stamp.fromSec(scan.stamp);
   return toMsg(scan.cloud, msg);
+}
+
+[[nodiscard]] bool toMsg(const std::vector<Eigen::Vector3d> &points,
+                         sensor_msgs::PointCloud2 &msg) noexcept {
+  msg.height = 1;
+
+  msg.width = points.size();
+
+  msg.fields.resize(3);
+  msg.fields[0].name = "x";
+  msg.fields[0].offset = 0;
+  msg.fields[0].datatype = getPointField<double>();
+  msg.fields[0].count = 1;
+
+  msg.fields[1].name = "y";
+  msg.fields[1].offset = sizeof(double);
+  msg.fields[1].datatype = getPointField<double>();
+  msg.fields[1].count = 1;
+
+  msg.fields[2].name = "z";
+  msg.fields[2].offset = (sizeof(double) + sizeof(double));
+  msg.fields[2].datatype = getPointField<double>();
+  msg.fields[2].count = 1;
+
+  msg.is_bigendian = (std::endian::native == std::endian::big);
+
+  msg.point_step = (3 * sizeof(double));
+
+  msg.row_step = msg.width * msg.point_step;
+
+  msg.data.clear();
+  msg.data.reserve(msg.row_step * msg.height);
+  for (const auto &point : points) {
+    pcl_types::serialize(msg.data, point);
+  }
+
+  msg.is_dense = false;
+
+  return true;
 }
 
 } // namespace pcl_types::ros1

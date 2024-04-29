@@ -4,7 +4,7 @@
 #include "point_lio/ekf.hpp"
 #include "point_lio/incremental_kd_tree.hpp"
 
-#include "ivox/ivox3d.h"
+#include "point_lio/voxel_grid.hpp"
 
 #include "pcl_types/pcl_types.hpp"
 
@@ -33,6 +33,7 @@ struct Imu {
 
 struct PointLIOParams {
   size_t imuInitializationQuota;
+  ultra_odometry::VoxelGridParams mapParams;
 };
 
 double square(const double x);
@@ -50,8 +51,6 @@ private:
   void boxplus(const Eigen::Vector<double, 24> &deltaState) noexcept;
 
   void propagateForwardInPlace(const double stamp) noexcept;
-
-  faster_lio::IVox<3, IVoxNodeType::DEFAULT, pcl_types::PointXYZICT> m_ivox;
 
 public:
   PointLIOParams m_params;
@@ -82,6 +81,8 @@ public:
   Eigen::Matrix<double, 12, 12> Q;
 
   Eigen::Matrix<double, 24, 24> covariance;
+
+  ultra_odometry::VoxelGrid<pcl_types::PointXYZI> m_map;
 
   // Constants
   static constexpr int world_R_body_index = 0;

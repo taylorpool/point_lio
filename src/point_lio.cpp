@@ -157,7 +157,7 @@ void initializeJ(Eigen::SparseMatrix<double, Eigen::RowMajor> &J) noexcept {
       world_gravity{0.0, 0.0, -9.81},
       body_angularVelocity{Eigen::Vector3d::Zero()},
       body_linearAcceleration{Eigen::Vector3d::Zero()}, Fx(24, 24), Fw(24, 12),
-      H_imu(6, 24), J(24, 24) {
+      H_imu(6, 24), J(24, 24), m_map(params.mapParams) {
 
   initializeFx(Fx);
   initializeFw(Fw);
