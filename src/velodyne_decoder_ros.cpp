@@ -100,8 +100,8 @@ VLP16Decoder::decode(const velodyne_msgs::VelodyneScan::ConstPtr &scan) {
                .intensity = intensity,
                .channel = static_cast<uint8_t>(channel),
                .timeOffset = timeOffset});
-          if (!result.cloud.back().getVec3Map().allFinite() ||
-              result.cloud.back().getVec3Map().squaredNorm() < 0.05) {
+          if (!result.cloud.back().getVector3fMap().allFinite() ||
+              result.cloud.back().getVector3fMap().squaredNorm() < 0.05) {
             result.cloud.pop_back();
           }
         }
@@ -204,7 +204,7 @@ VLP32CDecoder::decode(const velodyne_msgs::VelodyneScan::ConstPtr &msg) {
                .intensity = intensity,
                .channel = static_cast<uint8_t>(channel),
                .timeOffset = timeOffset});
-          if (!result.cloud.back().getVec3Map().allFinite()) {
+          if (!result.cloud.back().getVector3fMap().allFinite()) {
             result.cloud.pop_back();
           }
         }

@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
             geometry_msgs::Vector3Stamped outMsg;
             utils::ros1::toMsg(point.timeOffset + scanMsg->header.stamp.toSec(),
                                outMsg.header.stamp);
-            utils::ros1::toMsg(point.getVec3Map().cast<double>(),
+            utils::ros1::toMsg(point.getVector3fMap().cast<double>(),
                                outMsg.vector);
             while (!imuBuffer.empty() &&
                    imuBuffer.front()->header.stamp < outMsg.header.stamp) {
