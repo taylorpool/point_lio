@@ -57,7 +57,7 @@ public:
 
   std::deque<Imu> m_imuBuffer;
 
-  point_lio::KDTree KDT;
+  // point_lio::KDTree KDT;
 
   Stamp stamp;
   gtsam::Rot3 world_R_body;

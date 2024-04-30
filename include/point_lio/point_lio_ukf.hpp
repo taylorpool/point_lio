@@ -4,7 +4,7 @@
 #include "point_lio/ekf.hpp"
 #include "point_lio/incremental_kd_tree.hpp"
 
-#include "ivox/ivox3d.h"
+#include "point_lio/voxel_grid.hpp"
 
 #include "pcl_types/pcl_types.hpp"
 
@@ -33,32 +33,31 @@ struct Imu {
 
 struct PointLIOParams {
   size_t imuInitializationQuota;
+  ultra_odometry::VoxelGridParams mapParams;
 };
 
 double square(const double x);
 
 Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points);
 
-class PointLIO {
+class PointLIO_UKF {
 private:
   void initializeState() noexcept;
 
   void statePropagateForwardInPlace(const double dt) noexcept;
 
-  void PointLIO::covariancePropagateForwardInPlace(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt) noexcept;
+  void covariancePropagateForwardInPlace(const double dt) noexcept;
 
-  void boxplus(const Eigen::Vector<double, 24> &deltaState) noexcept;
+  // void boxplus(const Eigen::Vector<double, 24> &deltaState) noexcept;
 
-  void propagateForwardInPlace(const double stamp) noexcept;
-
-  faster_lio::IVox<3, IVoxNodeType::DEFAULT, pcl_types::PointXYZICT> m_ivox;
+  void propagateForwardInPlace(const double dt) noexcept;
 
 public:
   PointLIOParams m_params;
 
   std::deque<Imu> m_imuBuffer;
 
-  point_lio::KDTree KDT;
+  // point_lio::KDTree KDT;
 
   Stamp stamp;
   gtsam::Rot3 world_R_body;
@@ -70,10 +69,10 @@ public:
   Eigen::Vector3d body_angularVelocity;
   Eigen::Vector3d body_linearAcceleration;
 
-  Eigen::SparseMatrix<double, Eigen::RowMajor> Fx;
-  Eigen::SparseMatrix<double, Eigen::RowMajor> Fw;
-  Eigen::SparseMatrix<double> H_imu;
-  Eigen::SparseMatrix<double, Eigen::RowMajor> J;
+  // Eigen::SparseMatrix<double, Eigen::RowMajor> Fx;
+  // Eigen::SparseMatrix<double, Eigen::RowMajor> Fw;
+  // Eigen::SparseMatrix<double> H_imu;
+  // Eigen::SparseMatrix<double, Eigen::RowMajor> J;
 
   Eigen::Matrix<double, 6, 6> R_imu;
 
@@ -83,26 +82,24 @@ public:
 
   Eigen::Matrix<double, 22, 22> covariance;
 
-  Eigen::Matrix<double, 22, 22> new_covariance;
-
-  Eigen::Matrix<double, 22, 22> St;
+  ultra_odometry::VoxelGrid<pcl_types::PointXYZI> m_map;
 
   // Constants
   static constexpr int world_R_body_index = 0;
-  static constexpr int world_position_index = 3;
-  static constexpr int world_linearVelocity_index = 6;
-  static constexpr int imuBias_gyroscope_index = 9;
-  static constexpr int imuBias_accelerometer_index = 12;
-  static constexpr int world_gravity_index = 15;
-  static constexpr int body_angularVelocity_index = 18;
-  static constexpr int body_linearAcceleration_index = 21;
+  static constexpr int world_position_index = 4;
+  static constexpr int world_linearVelocity_index = 7;
+  static constexpr int imuBias_gyroscope_index = 10;
+  static constexpr int imuBias_accelerometer_index = 13;
+  // static constexpr int world_gravity_index = 16;
+  static constexpr int body_angularVelocity_index = 16;
+  static constexpr int body_linearAcceleration_index = 19;
 
   static constexpr int noise_bias_gyroscope_index = 0;
   static constexpr int noise_bias_accelerometer_index = 3;
   static constexpr int noise_gyroscope_index = 6;
   static constexpr int noise_accelerometer_index = 9;
 
-  [[nodiscard]] PointLIO(const PointLIOParams &params) noexcept;
+  [[nodiscard]] PointLIO_UKF(const PointLIOParams &params) noexcept;
 
   void registerImu(const Imu &imu) noexcept;
 
@@ -111,17 +108,20 @@ public:
   void registerScan(const pcl_types::LidarScanStamped &scan) noexcept;
 
   // UKF stuff
-  Eigen::VectorXd state;
-  Eigen::MatrixXd sigma_points;
-  Eigen::VectorXd sigma_mean;
-  Eigen::VectorXd meas_mean; 
+  Eigen::Vector<double, 22> state;
+  Eigen::Matrix<double, 22, 5> sigma_points;
+  Eigen::Vector<double, 22> sigma_mean;
+  Eigen::Vector<double, 22> meas_mean; 
+  Eigen::Matrix<double, 22, 5> meas_pred;
   const double alpha = 1;
   const double beta = 2;
   const double kappa = 0;
-  void generateSigmaPoints(const Eigen::VectorXd &state, const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, const double dt);
-  void computeMeanAndCovariance(const Eigen::MatrixXd &covariance, Eigen::MatrixXd &sigma_points, Eigen::VectorXd &sigma_mean);
-  void statePropagateForwardInPlace(const double dt, Eigen::MatrixXd &sigma_points) noexcept;
-  void computeCovariance(const Eigen::MatrixXd &new_covariance, const Eigen::MatrixXd &meas_pred, Eigen::MatrixXd &sigma_points, Eigen::VectorXd &sigma_mean, Eigen::VectorXd &meas_mean);
+  Eigen::Matrix<double, 22, 22> updated_covariance;
+  Eigen::Matrix<double, 22, 22> St;
+  void generateSigmaPoints(const Eigen::Vector<double,22>& X, const Eigen::Matrix<double,22,22>& covariance, Eigen::Matrix<double, 22, 5>& sigma_points, const double dt);
+  void computeMeanAndCovariance(Eigen::Matrix<double, 22, 22>& cov, Eigen::Matrix<double, 22, 5>& points, Eigen::Vector<double,22>& mean);
+  void sigmaPropagateForwardInPlace(const double dt, Eigen::Matrix<double, 22, 5>& sigma_points) noexcept;
+  void computeCovariance(Eigen::Matrix<double,22,22>& updated_covariance, Eigen::Matrix<double,22, 5>& meas_pred, Eigen::Matrix<double, 22, 5>& sigma_points, Eigen::Vector<double, 22>& sigma_mean, Eigen::Vector<double, 22>& meas_mean);
 };
 
 } // namespace point_lio

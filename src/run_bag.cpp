@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) noexcept {
   point_lio::PointLIOParams params;
   params.imuInitializationQuota = 100;
 
-  point_lio::PointLIO pointLIO(params);
+  point_lio::PointLIO_UKF pointLIO_UKF(params);
 
   for (const auto &msg : rosbag::View(inputbag)) {
     const auto topic = msg.getTopic();
