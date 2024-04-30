@@ -29,14 +29,10 @@ struct Imu {
   Eigen::Vector3d body_measuredAngularVelocity;
 };
 
-[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) noexcept;
-
 struct PointLIOParams {
   size_t imuInitializationQuota;
   ultra_odometry::VoxelGridParams mapParams;
 };
-
-double square(const double x);
 
 Eigen::Vector3d getPlaneNormal(const Eigen::MatrixXd &points);
 
@@ -48,9 +44,16 @@ private:
 
   void covariancePropagateForwardInPlace(const double dt) noexcept;
 
+  Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) noexcept;
+
   // void boxplus(const Eigen::Vector<double, 24> &deltaState) noexcept;
 
   void propagateForwardInPlace(const double dt) noexcept;
+
+  gtsam::Rot3 compute_plane_R_vec(const Eigen::Vector3d planeNormal,
+                    const Eigen::Vector3d vec) noexcept; 
+
+  double square(const double x);
 
 public:
   PointLIOParams m_params;

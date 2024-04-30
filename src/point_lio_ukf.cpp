@@ -5,10 +5,9 @@
 
 namespace point_lio {
 
-double square(const double x) { return x * x; }
+ double PointLIO_UKF::square(const double x) { return x * x; }
 
-[[nodiscard]] gtsam::Rot3
-compute_plane_R_vec(const Eigen::Vector3d planeNormal,
+[[nodiscard]] gtsam::Rot3 PointLIO_UKF::compute_plane_R_vec(const Eigen::Vector3d planeNormal,
                     const Eigen::Vector3d vec) noexcept {
   const double x_norm = vec.norm();
 
@@ -27,7 +26,7 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
                                  sin_theta * axis.y(), sin_theta * axis.z());
 }
 
-[[nodiscard]] Eigen::Matrix3d skewSymmetric(const Eigen::Vector3d v) noexcept {
+[[nodiscard]] Eigen::Matrix3d PointLIO_UKF::skewSymmetric(const Eigen::Vector3d v) noexcept {
   return (Eigen::Matrix3d() << 0, -v.z(), v.y(), v.z(), 0, -v.x(), -v.y(),
           v.x(), 0)
       .finished();
@@ -187,8 +186,11 @@ compute_plane_R_vec(const Eigen::Vector3d planeNormal,
 
   updated_covariance = Eigen::Matrix<double, 22, 22>::Identity() * 1e-2;
 
-  sigma_mean = Eigen::Vector3d::Zero();
-  meas_mean = Eigen::Vector3d::Zero(); 
+  Eigen::Matrix<double, 22, 1> sigma_mean;
+  sigma_mean.setZero();
+
+  Eigen::Matrix<double, 22, 1> meas_mean;
+  meas_mean.setZero();
   meas_pred = Eigen::Matrix<double, 22, 5>::Identity() * 1e-2;
 
   // Assigning updated values to state vector
@@ -504,7 +506,7 @@ void PointLIO_UKF::computeCovariance(Eigen::Matrix<double, 22, 22>& updated_cova
         
         Eigen::VectorXd diff = sigma_points.col(i) - sigma_mean;
         Eigen::VectorXd meas_diff = meas_pred.col(i) - meas_mean;
-        updated_covariance += Wc(i) * (diff * meas_diff);
+        updated_covariance = Wc(i) * (diff * meas_diff.transpose());
 
     }
 }
